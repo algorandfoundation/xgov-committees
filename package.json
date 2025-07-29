@@ -1,0 +1,24 @@
+{
+  "name": "xgov-committee-generator",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "algosdk": "^3.3.1",
+    "dotenv": "^17.2.1",
+    "p-map": "^7.0.3",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/yargs": "^17.0.33",
+    "tsx": "^4.20.3"
+  },
+  "type": "module"
+}
