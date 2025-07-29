@@ -1,7 +1,5 @@
-import pMap from "p-map";
 import { NetworkIDs } from "./algod";
-import { getCache } from "./cache";
-import { getBlock, getBlocks } from "./blocks";
+import { getBlock } from "./blocks";
 
 export type ProposerMap = Map<string, number[]>;
 

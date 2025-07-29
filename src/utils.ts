@@ -1,4 +1,4 @@
-import { access, readFile, writeFile } from "fs/promises";
+import { access } from "fs/promises";
 import { constants } from "fs";
 
 export async function fsExists(path: string) {
