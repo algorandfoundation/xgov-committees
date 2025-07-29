@@ -14,7 +14,7 @@ export type Config = {
 };
 
 // Load environment variables from .env file
-dotenv.config({ quiet: true });
+dotenv.config({ quiet: true, path: process.env.ENV });
 
 const argvConfig = [
   {
@@ -76,6 +76,17 @@ const argvConfig = [
   },
 ];
 
+function parseDefault(type: string, value: string | undefined, defaultValue: string | number | undefined) {
+  if (value !== undefined) {
+    if (type === "number") {
+      return parseInt(value, 10)
+    } else {
+      return value
+    }
+  }
+  return defaultValue
+}
+
 const parser = argvConfig.reduce(
   (
     parser,
@@ -86,7 +97,7 @@ const parser = argvConfig.reduce(
       description,
       demandOption: required,
       type: type as PositionalOptionsType,
-      default: process.env[envVar] ?? defaultValue,
+      default: parseDefault(type, process.env[envVar], defaultValue),
     });
   },
   yargs(hideBin(process.argv))
