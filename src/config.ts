@@ -9,7 +9,7 @@ export type Config = {
   algodToken: string;
   fromBlock: number;
   toBlock: number;
-  cachePath: string;
+  dataPath: string;
   concurrency: number;
 };
 
@@ -58,12 +58,12 @@ const argvConfig = [
     envVar: "LAST_BLOCK",
   },
   {
-    name: "cache-path",
+    name: "data-path",
     short: "d",
     type: "string",
     description: "path to cache block responses",
-    envVar: "CACHE_PATH",
-    defaultValue: ".cache/",
+    envVar: "DATA_PATH",
+    defaultValue: "data/",
   },
 
   {

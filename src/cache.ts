@@ -3,7 +3,7 @@ import { mkdirSync } from "fs";
 import { join } from "path";
 import { NetworkIDs } from "./algod";
 import { config } from "./config";
-import { Block, encodeJSON, decodeJSON, BlockHeader } from "algosdk";
+import { encodeJSON, decodeJSON, BlockHeader } from "algosdk";
 import { fsExists } from "./utils";
 
 export const getCachePath = (
@@ -12,7 +12,7 @@ export const getCachePath = (
 ): string => {
   const { genesisID, genesisHash } = networkIDs;
   const networkPath = join(
-    config.cachePath,
+    config.dataPath,
     `${genesisID}-${genesisHash.replace(/[\/=]/g, "_")}`,
     subPath
   );
