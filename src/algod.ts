@@ -16,3 +16,5 @@ export const getNetworkIDs = async () => {
     genesisHash: Buffer.from(genesisHash).toString("base64"),
   };
 };
+
+export const networkIDs = await getNetworkIDs();

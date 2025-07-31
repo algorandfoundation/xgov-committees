@@ -11,6 +11,7 @@ export type Config = {
   toBlock: number;
   dataPath: string;
   concurrency: number;
+  verbose: boolean;
 };
 
 // Load environment variables from .env file
@@ -65,7 +66,6 @@ const argvConfig = [
     envVar: "DATA_PATH",
     defaultValue: "data/",
   },
-
   {
     name: "concurrency",
     short: "c",
@@ -74,17 +74,31 @@ const argvConfig = [
     envVar: "CONCURRENCY",
     defaultValue: 1,
   },
+  {
+    name: "verbose",
+    short: "v",
+    type: "boolean",
+    description: "verbose mode",
+    envVar: "VERBOSE",
+    defaultValue: false,
+  },
 ];
 
-function parseDefault(type: string, value: string | undefined, defaultValue: string | number | undefined) {
+function parseDefault(
+  type: string,
+  value: string | undefined,
+  defaultValue: string | number | boolean | undefined
+) {
   if (value !== undefined) {
     if (type === "number") {
-      return parseInt(value, 10)
+      return parseInt(value, 10);
+    } else if (type === "boolean") {
+      return Boolean(value)
     } else {
-      return value
+      return value;
     }
   }
-  return defaultValue
+  return defaultValue;
 }
 
 const parser = argvConfig.reduce(

@@ -21,3 +21,18 @@ export function chunk<T>(array: T[], size: number): T[][] {
 export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms)); // pause for gc
 }
+
+export function formatDuration(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  seconds %= 86400;
+  const hours = Math.floor(seconds / 3600);
+  seconds %= 3600;
+  const minutes = Math.floor(seconds / 60);
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}D`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+  return parts.join(' ');
+}
