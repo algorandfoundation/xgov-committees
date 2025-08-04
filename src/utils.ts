@@ -19,7 +19,7 @@ export function chunk<T>(array: T[], size: number): T[][] {
 }
 
 export function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms)); // pause for gc
+  return new Promise((resolve) => setTimeout(resolve, ms)); // pause for gc
 }
 
 export function formatDuration(seconds: number): string {
@@ -34,5 +34,9 @@ export function formatDuration(seconds: number): string {
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
 
-  return parts.join(' ');
+  return parts.join(" ");
+}
+
+export function makeRndsArray(fromBlock: number, toBlock: number) {
+  return new Array(toBlock - fromBlock).fill(1).map((_, i) => fromBlock + i);
 }

@@ -95,6 +95,10 @@ export class CacheManager {
     );
   }
 
+  hasDirty() {
+    return [...this.pages.values()].some((p) => p.dirty);
+  }
+
   async evictPage() {
     if (this.numPages > this.maxPages) {
       const [pageStart, page] = this.oldestPage;
@@ -143,12 +147,14 @@ for (const sig of [
 ]) {
   process.on(sig, gracefulExit);
   async function gracefulExit() {
-    console.log("\nFlushing data to disk before exit");
-    try {
-      await cacheManager.evictAllPages();
-      console.log("OK");
-    } catch (e) {
-      console.error("While shutting down:", e);
+    if (cacheManager.hasDirty()) {
+      console.log("\nFlushing data to disk before exit");
+      try {
+        await cacheManager.evictAllPages();
+        console.log("OK");
+      } catch (e) {
+        console.error("While shutting down:", e);
+      }
     }
     process.exit(0);
   }

@@ -1,4 +1,3 @@
-import { BlockHeader } from "algosdk";
 import { readFile, writeFile } from "fs/promises";
 import { hashBuffer } from "./utils";
 import { fsExists } from "../utils";

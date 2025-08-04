@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir } from "fs/promises";
+import { readFile, readdir } from "fs/promises";
 import { mkdirSync } from "fs";
 import { join } from "path";
 import { networkIDs, NetworkIDs } from "../algod";
@@ -11,7 +11,7 @@ export const getCachedRounds = async (
   min: number,
   max: number
 ): Promise<Set<number>> => {
-  process.stderr.write("Checking cache")
+  process.stderr.write("Checking block cache")
   const minPage = getPageStartRnd(min);
   const maxPage = getPageStartRnd(max);
   const cachePath = getCachePath(networkIDs);

@@ -1,10 +1,9 @@
 import pMap from "p-map";
 import { config } from "./config";
-import { NetworkIDs, algod, networkIDs } from "./algod";
+import { algod, networkIDs } from "./algod";
 import { subtractCached, getCache, setCache } from "./cache";
 import { chunk, formatDuration, sleep } from "./utils";
 import { BlockHeader } from "algosdk";
-import { cacheManager } from "./cache/cache-manager";
 
 export const getBlocks = async (rnds: number[]) => {
   let total = rnds.length;
