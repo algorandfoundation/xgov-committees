@@ -19,6 +19,46 @@ dotenv.config({ quiet: true, path: process.env.ENV });
 
 const argvConfig = [
   {
+    name: "registry-app-id",
+    short: "a",
+    type: "number",
+    description: "xGov Registry App ID",
+    envVar: "REGISTRY_APP_ID",
+    defaultValue: 3147789458, // Mainnet registry
+  },
+  {
+    name: "from-block",
+    short: "f",
+    type: "number",
+    required: true,
+    description: "first block to process",
+    envVar: "FIRST_BLOCK",
+  },
+  {
+    name: "to-block",
+    short: "t",
+    type: "number",
+    required: true,
+    description: "last block to process",
+    envVar: "LAST_BLOCK",
+  },
+  {
+    name: "cutoff-block",
+    short: "c",
+    type: "number",
+    required: true,
+    description: "xGov subscriptions cutoff block",
+    envVar: "CUTOFF_BLOCK",
+  },
+  {
+    name: "concurrency",
+    short: "C",
+    type: "number",
+    description: "number of concurrent requests to maintain",
+    envVar: "CONCURRENCY",
+    defaultValue: 1,
+  },
+  {
     name: "algod-server",
     short: "s",
     type: "string",
@@ -43,36 +83,12 @@ const argvConfig = [
     defaultValue: "",
   },
   {
-    name: "from-block",
-    short: "f",
-    type: "number",
-    required: true,
-    description: "first block to process",
-    envVar: "FIRST_BLOCK",
-  },
-  {
-    name: "to-block",
-    short: "t",
-    type: "number",
-    required: true,
-    description: "last block to process",
-    envVar: "LAST_BLOCK",
-  },
-  {
     name: "data-path",
     short: "d",
     type: "string",
     description: "path to cache block responses",
     envVar: "DATA_PATH",
     defaultValue: "data/",
-  },
-  {
-    name: "concurrency",
-    short: "c",
-    type: "number",
-    description: "number of concurrent requests to maintain",
-    envVar: "CONCURRENCY",
-    defaultValue: 1,
   },
   {
     name: "verbose",
@@ -93,7 +109,7 @@ function parseDefault(
     if (type === "number") {
       return parseInt(value, 10);
     } else if (type === "boolean") {
-      return Boolean(value)
+      return Boolean(value);
     } else {
       return value;
     }
@@ -118,3 +134,15 @@ const parser = argvConfig.reduce(
 );
 
 export const config = parser.help().parseSync() as unknown as Config;
+
+for(const argvConfigEntry of argvConfig) {
+  const { name, type } = argvConfigEntry
+  if (type !== "number")
+    continue
+  // @ts-ignore - kebabcase is not in type but is the easiest way to access from argvConfig entries
+  const value = config[name]
+  if (isNaN(value)) {
+    console.error(`Configuration value "${name}" expected a number, found non-numeric value`)
+    process.exit(1)
+  }
+}
