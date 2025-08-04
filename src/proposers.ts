@@ -1,5 +1,4 @@
 import pMap from "p-map";
-import { networkIDs } from "./algod";
 import { getBlock } from "./blocks";
 import { chunk, makeRndsArray, sleep } from "./utils";
 import { writeFile, readFile } from "fs/promises";
@@ -58,7 +57,7 @@ export async function loadProposers(fromBlock: number, toBlock: number): Promise
   const cacheSubPath = "proposers";
   await ensureCachePathExists(cacheSubPath);
 
-  const cachePath = getCachePath(networkIDs, cacheSubPath);  
+  const cachePath = getCachePath(cacheSubPath);  
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.jsons`);
   process.stderr.write("Trying to load proposers cache");
 
@@ -130,7 +129,7 @@ export async function saveProposers(
   proposers: ProposerMap
 ) {
   const cacheSubPath = "proposers";
-  const cachePath = getCachePath(networkIDs, cacheSubPath);
+  const cachePath = getCachePath(cacheSubPath);
   await ensureCachePathExists(cacheSubPath);
 
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.jsons`);

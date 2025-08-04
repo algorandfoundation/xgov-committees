@@ -1,4 +1,3 @@
-import { networkIDs } from "./algod";
 import { getBlocks } from "./blocks";
 import { ensureCachePathExists } from "./cache";
 import { cacheManager } from "./cache/cache-manager";
@@ -11,7 +10,7 @@ import { config } from "./config";
 import { getBlockProposers, loadProposers, saveProposers } from "./proposers";
 import { makeRndsArray } from "./utils";
 
-await ensureCachePathExists();
+await ensureCachePathExists("blocks");
 
 const { fromBlock, toBlock } = config;
 

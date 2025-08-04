@@ -1,6 +1,6 @@
 import pMap from "p-map";
 import { config } from "./config";
-import { algod, networkIDs } from "./algod";
+import { algod, networkMetadata } from "./algod";
 import { subtractCached, getCache, setCache } from "./cache";
 import { chunk, formatDuration, sleep } from "./utils";
 import { BlockHeader } from "algosdk";
@@ -14,7 +14,7 @@ export const getBlocks = async (rnds: number[]) => {
   const requiredRnds = await subtractCached(rnds);
   let processed = rnds.length - requiredRnds.length;
 
-  console.log(`Network:\t${networkIDs.genesisID}`)
+  console.log(`Network:\t${networkMetadata.genesisID}`)
   console.log(`Node:   \t${config.algodServer}`)
 
   console.log(
@@ -73,9 +73,9 @@ export const getBlock = async (rnd: number): Promise<BlockHeader> => {
       }
 
       const actualGenesisHash = Buffer.from(genesisHash).toString("base64");
-      if (actualGenesisHash !== networkIDs.genesisHash) {
+      if (actualGenesisHash !== networkMetadata.genesisHash) {
         throw new Error(
-          `Unexpected genesis hash, found ${actualGenesisHash}, expected ${networkIDs.genesisHash}`
+          `Unexpected genesis hash, found ${actualGenesisHash}, expected ${networkMetadata.genesisHash}`
         );
       }
 

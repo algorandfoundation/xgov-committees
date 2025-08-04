@@ -1,6 +1,5 @@
 import { join } from "path";
-import { networkIDs } from "./algod";
-import { ensureCachePathExists } from "./cache";
+import { ensureCachePathExists as ensureCacheSubPathExists } from "./cache";
 import { getCachePath } from "./cache/utils";
 import { readFile, writeFile } from "fs/promises";
 import { ProposerMap } from "./proposers";
@@ -18,9 +17,9 @@ export async function loadCandidateCommittee(
   toBlock: number
 ): Promise<CandidateCommittee | undefined> {
   const cacheSubPath = "candidate-committee";
-  await ensureCachePathExists(cacheSubPath);
+  await ensureCacheSubPathExists(cacheSubPath);
 
-  const cachePath = getCachePath(networkIDs, cacheSubPath);
+  const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
 
   let fileContents: string = "";
@@ -51,9 +50,9 @@ export async function saveCandidateCommittee(
   committee: CandidateCommittee
 ): Promise<void> {
   const cacheSubPath = "candidate-committee";
-  await ensureCachePathExists(cacheSubPath);
+  await ensureCacheSubPathExists(cacheSubPath);
 
-  const cachePath = getCachePath(networkIDs, cacheSubPath);
+  const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
   console.log(`Writing candidate committee to ${filePath}`);
 

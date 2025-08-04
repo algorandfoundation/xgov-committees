@@ -7,9 +7,9 @@ export const algod = new Algodv2(
   config.algodPort
 );
 
-export type NetworkIDs = { genesisID: string; genesisHash: string };
+export type NetworkMetadata = { genesisID: string; genesisHash: string };
 
-export const getNetworkIDs = async () => {
+export const getNetworkMetadata = async () => {
   const { genesisID, genesisHash } = await algod.getTransactionParams().do();
   return {
     genesisID,
@@ -17,4 +17,4 @@ export const getNetworkIDs = async () => {
   };
 };
 
-export const networkIDs = await getNetworkIDs();
+export const networkMetadata = await getNetworkMetadata();
