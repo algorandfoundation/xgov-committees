@@ -47,7 +47,6 @@ export const getCachedRounds = async (
 
 export async function subtractCached(
   rnds: number[],
-  networkIDs: NetworkIDs
 ): Promise<number[]> {
   const min = rnds[0];
   const max = rnds[rnds.length - 1];
@@ -56,7 +55,6 @@ export async function subtractCached(
 }
 
 export async function ensureCachePathExists(
-  networkIDs: NetworkIDs,
   subPath = "blocks"
 ) {
   const cachePath = getCachePath(networkIDs, subPath);

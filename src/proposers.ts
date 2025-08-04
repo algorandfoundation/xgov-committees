@@ -9,6 +9,9 @@ import { getCachePath } from "./cache/utils";
 
 export type ProposerMap = Map<string, number[]>;
 
+/*
+ * Create proposer map of [proposer] -> proposed_round[]
+ */
 export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
   const proposers: ProposerMap = new Map();
 
@@ -47,11 +50,15 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
   return proposers;
 }
 
-export async function loadProposers(fromBlock: number, toBlock: number) {
+/*
+ * Load proposer -> proposed_rounds Map from cache.
+ * Validates 1) valid JSON, 2) no duplicate proposers, 3) no duplicate rounds, 4) no missing rounds
+ */
+export async function loadProposers(fromBlock: number, toBlock: number): Promise<ProposerMap | undefined> {
   const cacheSubPath = "proposers";
-  const cachePath = getCachePath(networkIDs, cacheSubPath);
-  await ensureCachePathExists(networkIDs, cacheSubPath);
+  await ensureCachePathExists(cacheSubPath);
 
+  const cachePath = getCachePath(networkIDs, cacheSubPath);  
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.jsons`);
   process.stderr.write("Trying to load proposers cache");
 
@@ -114,6 +121,9 @@ export async function loadProposers(fromBlock: number, toBlock: number) {
   }
 }
 
+/*
+ * Save proposers map to disk in jsonstream format
+ */
 export async function saveProposers(
   fromBlock: number,
   toBlock: number,
@@ -121,7 +131,7 @@ export async function saveProposers(
 ) {
   const cacheSubPath = "proposers";
   const cachePath = getCachePath(networkIDs, cacheSubPath);
-  await ensureCachePathExists(networkIDs, cacheSubPath);
+  await ensureCachePathExists(cacheSubPath);
 
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.jsons`);
   console.log(`Writing proposers to ${filePath}`);

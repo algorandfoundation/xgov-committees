@@ -11,7 +11,7 @@ export const getBlocks = async (rnds: number[]) => {
   const startBlock = rnds[0];
   const endBlock = rnds.at(-1);
 
-  const requiredRnds = await subtractCached(rnds, networkIDs);
+  const requiredRnds = await subtractCached(rnds);
   let processed = rnds.length - requiredRnds.length;
 
   console.log(`Network:\t${networkIDs.genesisID}`)
