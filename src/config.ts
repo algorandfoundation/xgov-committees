@@ -4,11 +4,13 @@ import type { PositionalOptionsType } from "yargs";
 import { hideBin } from "yargs/helpers";
 
 export type Config = {
+  registryAppId: number;
+  fromBlock: number;
+  toBlock: number;
+  cutoffBlock: number;
   algodServer: string;
   algodPort: number;
   algodToken: string;
-  fromBlock: number;
-  toBlock: number;
   dataPath: string;
   concurrency: number;
   verbose: boolean;
