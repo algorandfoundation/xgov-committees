@@ -1,12 +1,17 @@
 import pMap from "p-map";
 import { getBlock } from "./blocks";
-import { chunk, makeRndsArray, sleep } from "./utils";
+import { chunk, clearLine, fsExists, makeRndsArray, sleep } from "./utils";
 import { writeFile, readFile } from "fs/promises";
 import { join } from "path";
-import { ensureCachePathExists } from "./cache";
+import { ensureCacheSubPathExists } from "./cache";
 import { getCachePath } from "./cache/utils";
+import { cacheManager } from "./cache/cache-manager";
+import { CACHE_PAGE_SIZE } from "./cache/cache-page";
 
 export type ProposerMap = Map<string, number[]>;
+
+const label = "proposers";
+const cacheSubPath = "proposers";
 
 /*
  * Create proposer map of [proposer] -> proposed_round[]
@@ -16,7 +21,7 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
 
   let total = rnds.length;
   let processed = 0;
-  const chunks = chunk(rnds, 100_000);
+  const chunks = chunk(rnds, CACHE_PAGE_SIZE);
   for (const chunked of chunks) {
     await pMap(
       chunked,
@@ -34,17 +39,15 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
         processed++;
         const percent = ((100 * processed) / total).toFixed(2);
         process.stdout.write(
-          `\rBlock proposer:\t${rnd} ${processed}/${total} ${percent}%`
+          `\rBlock proposer:\t${rnd} ${processed}/${total} ${percent}%   `
         );
       },
-      { concurrency: 1_000 }
+      { concurrency: 100 }
     );
     await sleep(50); // pause for gb
   }
 
-  process.stdout.write(
-    `\r                                                        `
-  );
+  clearLine();
   process.stdout.write(`\rProposer data:\t${total} OK\n`);
   return proposers;
 }
@@ -53,21 +56,19 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
  * Load proposer -> proposed_rounds Map from cache.
  * Validates 1) valid JSON, 2) no duplicate proposers, 3) no duplicate rounds, 4) no missing rounds
  */
-export async function loadProposers(fromBlock: number, toBlock: number): Promise<ProposerMap | undefined> {
-  const cacheSubPath = "proposers";
-  await ensureCachePathExists(cacheSubPath);
-
-  const cachePath = getCachePath(cacheSubPath);  
+export async function loadProposers(
+  fromBlock: number,
+  toBlock: number
+): Promise<ProposerMap | undefined> {
+  const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.jsons`);
-  process.stderr.write("Trying to load proposers cache");
 
-  let fileContents: string = "";
-  try {
-    fileContents = (await readFile(filePath)).toString();
-  } catch (e) {}
+  if (await fsExists(filePath)) {
+    process.stderr.write(`Trying to load ${label} cache`);
 
-  if (fileContents !== "") {
     try {
+      const fileContents = (await readFile(filePath)).toString();
+
       const map: ProposerMap = new Map();
       const lines = fileContents.split("\n").filter(Boolean); // split + trim empty lines
       // parse JSONstream file
@@ -111,11 +112,11 @@ export async function loadProposers(fromBlock: number, toBlock: number): Promise
           `Proposers cache incomplete, missing rounds: ${rndsStr}`
         );
       }
-
-      console.log(`\rUsing cached proposers file: ${filePath}`);
+      clearLine();
+      console.log(`\rUsing cached ${label} file: ${filePath}`);
       return map;
     } catch (e) {
-      console.warn(`\nIgnoring cached proposers file: ${e}`);
+      console.warn(`\nIgnoring cached ${label} file: ${e}`);
     }
   }
 }
@@ -128,12 +129,11 @@ export async function saveProposers(
   toBlock: number,
   proposers: ProposerMap
 ) {
-  const cacheSubPath = "proposers";
   const cachePath = getCachePath(cacheSubPath);
-  await ensureCachePathExists(cacheSubPath);
+  await ensureCacheSubPathExists(cacheSubPath);
 
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.jsons`);
-  console.log(`Writing proposers to ${filePath}`);
+  console.log(`Writing ${label} to ${filePath}`);
 
   await writeFile(filePath, serializeProposers(proposers));
 }

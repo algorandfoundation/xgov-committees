@@ -40,3 +40,14 @@ export function formatDuration(seconds: number): string {
 export function makeRndsArray(fromBlock: number, toBlock: number) {
   return new Array(toBlock - fromBlock).fill(1).map((_, i) => fromBlock + i);
 }
+
+export function clearLine() {
+  process.stderr.write(
+    "\r                                                                              "
+  );
+  process.stderr.write("\r");
+}
+
+export function isEqual(a: any[], b: any[]) {
+  return a.every((v, k) => b[k] === v)
+}

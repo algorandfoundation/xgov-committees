@@ -3,7 +3,7 @@ import { mkdirSync } from "fs";
 import { join } from "path";
 import { networkMetadata, NetworkMetadata } from "../algod";
 import { encodeJSON, decodeJSON, BlockHeader } from "algosdk";
-import { chunk, fsExists, sleep } from "../utils";
+import { chunk, clearLine, fsExists, sleep } from "../utils";
 import { getCachePath } from "./utils";
 import { cacheManager, getPageStartRnd } from "./cache-manager";
 
@@ -11,7 +11,7 @@ export const getCachedRounds = async (
   min: number,
   max: number
 ): Promise<Set<number>> => {
-  process.stderr.write("Checking block cache");
+  process.stderr.write("Reading block cache, please wait. This can take a while.");
   const minPage = getPageStartRnd(min);
   const maxPage = getPageStartRnd(max);
   const cachePath = getCachePath("blocks");
@@ -42,8 +42,7 @@ export const getCachedRounds = async (
     );
     await sleep(50); // gc
   }
-  process.stderr.write("\r               ");
-  process.stderr.write("\r");
+  clearLine()
   return new Set(rounds);
 };
 
@@ -54,7 +53,7 @@ export async function subtractCached(rnds: number[]): Promise<number[]> {
   return rnds.filter((rnd) => !existing.has(rnd));
 }
 
-export async function ensureCachePathExists(subPath: string) {
+export async function ensureCacheSubPathExists(subPath: string) {
   const cachePath = getCachePath(subPath);
   if (!(await fsExists(cachePath))) {
     console.log("Creating", cachePath);

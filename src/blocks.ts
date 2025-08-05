@@ -2,7 +2,7 @@ import pMap from "p-map";
 import { config } from "./config";
 import { algod, networkMetadata } from "./algod";
 import { subtractCached, getCache, setCache } from "./cache";
-import { chunk, formatDuration, sleep } from "./utils";
+import { chunk, clearLine, formatDuration, sleep } from "./utils";
 import { BlockHeader } from "algosdk";
 
 export const getBlocks = async (rnds: number[]) => {
@@ -14,17 +14,19 @@ export const getBlocks = async (rnds: number[]) => {
   const requiredRnds = await subtractCached(rnds);
   let processed = rnds.length - requiredRnds.length;
 
-  console.log(`Network:\t${networkMetadata.genesisID}`)
-  console.log(`Node:   \t${config.algodServer}`)
-
-  console.log(
-    `Start block:\t${startBlock}\nEnd block:\t${endBlock}\nTotal blocks:\t${total}\nExisting:\t${processed}\nRemaining:\t${
-      total - processed
-    }`
-  );
+  console.log(`Network:\t${networkMetadata.genesisID}`);
+  console.log(`Registry app:\t${config.registryAppId}`);
+  console.log(`Node:   \t${config.algodServer}`);
+  console.log(`Token:  \t${config.algodToken ? "Yes":"No"}`)
+  console.log(`First block:\t${startBlock}`);
+  console.log(`Last block:\t${endBlock}`);
+  console.log("--")
+  console.log(`Total blocks:\t${total}`);
+  console.log(`Existing:\t${processed}`);
+  console.log(`Remaining:\t${total - processed}`);
+  console.log("--")
 
   const chunks = chunk(requiredRnds, 1_000);
-  let run = true;
   for (const chunk of chunks) {
     try {
       const start = Date.now();
@@ -43,10 +45,8 @@ export const getBlocks = async (rnds: number[]) => {
     await sleep(50); // pause for gc
   }
 
-  process.stdout.write(
-    `\r                                                        `
-  );
-  process.stdout.write(`\rBlock data: \t${total} OK\n`);
+  clearLine();
+  process.stdout.write(`Block data: \t${total} OK\n`);
 
   async function getBlockWithStatus(rnd: number): Promise<BlockHeader> {
     const data = await getBlock(rnd);
@@ -55,7 +55,7 @@ export const getBlocks = async (rnds: number[]) => {
     const etaSec = (total - processed) / parseFloat(v);
     process.stdout.write(
       `\rFetching block:\t${rnd} ${processed}/${total} ${percent}%${
-        v ? ` ${v} rnd/sec ETA ${formatDuration(etaSec)}` : ""
+        v ? ` ${v} rnd/sec ETA ${formatDuration(etaSec)}        ` : ""
       }`
     );
     return data;

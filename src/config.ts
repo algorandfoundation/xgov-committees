@@ -7,7 +7,6 @@ export type Config = {
   registryAppId: number;
   fromBlock: number;
   toBlock: number;
-  cutoffBlock: number;
   algodServer: string;
   algodPort: number;
   algodToken: string;
@@ -43,14 +42,6 @@ const argvConfig = [
     required: true,
     description: "last block to process",
     envVar: "LAST_BLOCK",
-  },
-  {
-    name: "cutoff-block",
-    short: "c",
-    type: "number",
-    required: true,
-    description: "xGov subscriptions cutoff block",
-    envVar: "CUTOFF_BLOCK",
   },
   {
     name: "concurrency",

@@ -2,6 +2,11 @@ import { decodeUint64, encodeAddress } from "algosdk";
 import { algod } from "./algod";
 import { config } from "./config";
 import pMap from "p-map";
+import { getCachePath } from "./cache/utils";
+import { ensureCacheSubPathExists } from "./cache";
+import { join } from "path";
+import { readFile, writeFile } from "fs/promises";
+import { clearLine, fsExists } from "./utils";
 
 /*
     Gets subscribed xGovs from registry contract
@@ -15,10 +20,13 @@ import pMap from "p-map";
         subscription_round: arc4.UInt64         48      8
 */
 
-const { cutoffBlock, registryAppId, concurrency, verbose } = config;
+const label = "subscribed xGovs";
+const cacheSubPath = "subscribed-xGovs";
+
+const { toBlock: cutoffBlock, registryAppId, concurrency, verbose } = config;
 const xgovBoxPrefix = "x".charCodeAt(0);
 
-async function getSubscribedXgovs({
+export async function getSubscribedXgovs({
   force,
 }: {
   force?: true;
@@ -87,4 +95,37 @@ async function getSubscribedXgovs({
   return xGovs;
 }
 
-getSubscribedXgovs()
+export async function loadSubscribedXgovs(
+  fromBlock: number,
+  toBlock: number
+): Promise<string[] | undefined> {
+  const cachePath = getCachePath(cacheSubPath);
+  const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
+
+  if (await fsExists(filePath)) {
+    process.stderr.write(`Trying to load ${label} cache ${filePath}`);
+    try {
+      const fileContents = (await readFile(filePath)).toString();
+      const subscribed = JSON.parse(fileContents) as string[];
+      clearLine();
+      console.log(`\rUsing cached ${label} file: ${filePath}`);
+      return subscribed;
+    } catch (e) {
+      console.warn(`\nIgnoring ${label} file: ${(e as Error).message}`);
+    }
+  }
+}
+
+export async function saveSubscribedXgovs(
+  fromBlock: number,
+  toBlock: number,
+  subscribed: string[]
+): Promise<void> {
+  await ensureCacheSubPathExists(cacheSubPath);
+
+  const cachePath = getCachePath(cacheSubPath);
+  const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
+  console.log(`Writing ${label} to ${filePath}`);
+
+  await writeFile(filePath, JSON.stringify(subscribed));
+}

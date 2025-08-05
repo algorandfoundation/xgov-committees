@@ -1,46 +1,53 @@
 import { join } from "path";
-import { ensureCachePathExists as ensureCacheSubPathExists } from "./cache";
+import { ensureCacheSubPathExists as ensureCacheSubPathExists } from "./cache";
 import { getCachePath } from "./cache/utils";
 import { readFile, writeFile } from "fs/promises";
 import { ProposerMap } from "./proposers";
+import { clearLine, fsExists } from "./utils";
 
-type CandidateCommittee = Record<string, number>
+export type CandidateCommittee = Record<string, number>;
+
+const label = "candidate committee";
+const cacheSubPath = "candidate-committee";
 
 export async function getCandidateCommittee(proposerMap: ProposerMap) {
-    return Object.fromEntries(
-        [...proposerMap.entries()].map(([proposer, rnds]) => [proposer, rnds.length])
-    )
+  return Object.fromEntries(
+    [...proposerMap.entries()].map(([proposer, rnds]) => [
+      proposer,
+      rnds.length,
+    ])
+  );
 }
 
 export async function loadCandidateCommittee(
   fromBlock: number,
   toBlock: number
 ): Promise<CandidateCommittee | undefined> {
-  const cacheSubPath = "candidate-committee";
-  await ensureCacheSubPathExists(cacheSubPath);
-
   const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
 
-  let fileContents: string = "";
-  try {
-    fileContents = (await readFile(filePath)).toString();
-  } catch (e) {}
+  if (await fsExists(filePath)) {
+    process.stderr.write(`Trying to load ${label} cache ${filePath}`);
+    try {
+      const fileContents = (await readFile(filePath)).toString();
+      const committee = JSON.parse(fileContents) as Record<string, number>;
 
-  if (fileContents !== "") {
-    process.stderr.write("Trying to load candidate committee cache")
-    const committee = JSON.parse(fileContents) as Record<string, number>
-
-    const expectedCount = toBlock - fromBlock
-    const actualCount = Object.values(committee).reduce((sum, value) => sum + value, 0)
-    if (actualCount !== expectedCount) {
-        console.warn(`\nExpected ${expectedCount} rounds, found ${actualCount} in candidate committee file ${filePath}`)
-        console.warn(`Ignoring cached candidate committee file`)
-        return
+      const expectedCount = toBlock - fromBlock;
+      const actualCount = Object.values(committee).reduce(
+        (sum, value) => sum + value,
+        0
+      );
+      if (actualCount !== expectedCount) {
+        throw new Error(
+          `Expected ${expectedCount} rounds, found ${actualCount} in ${label} file ${filePath}`
+        );
+      }
+      clearLine();
+      console.log(`\rUsing cached ${label} file: ${filePath}`);
+      return committee;
+    } catch (e) {
+      console.warn(`\nIgnoring cached ${label} file: ${(e as Error).message}`);
     }
-
-    console.log(`\rUsing cached candidate committee file: ${filePath}`);
-    return committee
   }
 }
 
@@ -49,12 +56,11 @@ export async function saveCandidateCommittee(
   toBlock: number,
   committee: CandidateCommittee
 ): Promise<void> {
-  const cacheSubPath = "candidate-committee";
   await ensureCacheSubPathExists(cacheSubPath);
 
   const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
-  console.log(`Writing candidate committee to ${filePath}`);
+  console.log(`Writing ${label} to ${filePath}`);
 
-  await writeFile(filePath, JSON.stringify(committee))
+  await writeFile(filePath, JSON.stringify(committee));
 }
