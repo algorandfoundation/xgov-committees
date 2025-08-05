@@ -1,9 +1,9 @@
-import { readFile, writeFile, readdir } from "fs/promises";
+import { readFile, readdir } from "fs/promises";
 import { mkdirSync } from "fs";
 import { join } from "path";
-import { networkIDs, NetworkIDs } from "../algod";
+import { networkMetadata, NetworkMetadata } from "../algod";
 import { encodeJSON, decodeJSON, BlockHeader } from "algosdk";
-import { chunk, fsExists, sleep } from "../utils";
+import { chunk, clearLine, fsExists, sleep } from "../utils";
 import { getCachePath } from "./utils";
 import { cacheManager, getPageStartRnd } from "./cache-manager";
 
@@ -11,10 +11,10 @@ export const getCachedRounds = async (
   min: number,
   max: number
 ): Promise<Set<number>> => {
-  process.stderr.write("Checking cache")
+  process.stderr.write("Reading block cache, please wait. This can take a while.");
   const minPage = getPageStartRnd(min);
   const maxPage = getPageStartRnd(max);
-  const cachePath = getCachePath(networkIDs);
+  const cachePath = getCachePath("blocks");
   const filenames = (await readdir(cachePath)).filter((filename) => {
     if (!filename.endsWith(".json")) return;
     const pageNum = parseInt(filename.split(".")[0], 10);
@@ -31,7 +31,9 @@ export const getCachedRounds = async (
           const filename = join(cachePath, basename);
           const buffer = await readFile(filename);
           const data = JSON.parse(buffer.toString());
-          const existingRounds = new Set(Object.keys(data).map((s) => parseInt(s, 10)))
+          const existingRounds = new Set(
+            Object.keys(data).map((s) => parseInt(s, 10))
+          );
           rounds.push(...existingRounds);
         } catch (e) {
           // pretend corrupt files do not exist, they will be overwritten anyway
@@ -40,26 +42,19 @@ export const getCachedRounds = async (
     );
     await sleep(50); // gc
   }
-  process.stderr.write("\r               ")
-  process.stderr.write("\r")
+  clearLine()
   return new Set(rounds);
 };
 
-export async function subtractCached(
-  rnds: number[],
-  networkIDs: NetworkIDs
-): Promise<number[]> {
+export async function subtractCached(rnds: number[]): Promise<number[]> {
   const min = rnds[0];
   const max = rnds[rnds.length - 1];
   const existing = await getCachedRounds(min, max);
   return rnds.filter((rnd) => !existing.has(rnd));
 }
 
-export async function ensureCachePathExists(
-  networkIDs: NetworkIDs,
-  subPath = "blocks"
-) {
-  const cachePath = getCachePath(networkIDs, subPath);
+export async function ensureCacheSubPathExists(subPath: string) {
+  const cachePath = getCachePath(subPath);
   if (!(await fsExists(cachePath))) {
     console.log("Creating", cachePath);
     await mkdirSync(cachePath, { recursive: true });
