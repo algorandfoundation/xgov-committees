@@ -18,11 +18,11 @@ function getCommitteeFixture(): Committee {
     xGovs: [
       {
         address: "ROBOTMMVHPOETOTAX3J26UXYKVZX6QB7FHHYGBC44JNBUXMTABD5I3CODE",
-        votes: 2,
+        votes: 3,
       },
       {
         address: "ZOMBILANDSIUYQWIUYNKUYZVMCYY6IIT5IBAVNJYYWTVMQVZRBORLOP37E",
-        votes: 2,
+        votes: 1,
       },
     ],
   };
@@ -109,7 +109,6 @@ describe("Committee validator", () => {
     );
   });
 
-
   it("Should fail without missing required keys", () => {
     const testCommittee = getCommitteeFixture();
     // @ts-ignore
@@ -117,7 +116,24 @@ describe("Committee validator", () => {
     expect(() =>
       validateCommitteeString(JSON.stringify(testCommittee))
     ).toThrow(
-      `Committee JSON did not pass schema validation`
+      `Committee JSON did not pass schema validation: must have required property 'networkGenesisHash'`
+    );
+  });
+
+  it("Should fail without extra keys", () => {
+    const testCommittee = getCommitteeFixture();
+    expect(() =>
+      validateCommitteeString(JSON.stringify({ ...testCommittee, extra: 1 }))
+    ).toThrow(
+      `Committee JSON did not pass schema validation: must NOT have additional properties`
+    );
+  });
+
+  it("Should fail with []", () => {
+    expect(() =>
+      validateCommitteeString(JSON.stringify([]))
+    ).toThrow(
+      `Committee JSON did not pass schema validation: must be object`
     );
   });
 });

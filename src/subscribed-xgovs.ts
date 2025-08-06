@@ -20,6 +20,8 @@ import { clearLine, fsExists } from "./utils";
         subscription_round: arc4.UInt64         48      8
 */
 
+export type XGovsRecord = Record<string, number>
+
 const label = "subscribed xGovs";
 const cacheSubPath = "subscribed-xGovs";
 
@@ -30,7 +32,7 @@ export async function getSubscribedXgovs({
   force,
 }: {
   force?: true;
-} = {}): Promise<string[]> {
+} = {}): Promise<XGovsRecord> {
   const { lastRound } = await algod.status().do();
 
   if (lastRound < cutoffBlock) {
@@ -49,11 +51,11 @@ export async function getSubscribedXgovs({
     .filter(({ name }) => name[0] === xgovBoxPrefix)
     .map(({ name }) => name);
   console.log(
-    `Found ${xgovBoxes.length} subscribed xGovs. Querying subscription rounds. Cutoff_block=${cutoffBlock} `
+    `Found ${xgovBoxes.length} xGovs. Querying subscription rounds. Cutoff_block=${cutoffBlock} `
   );
 
   let ignored = 0;
-  const xGovs: string[] = [];
+  const xGovs: XGovsRecord = {};
   await pMap(
     xgovBoxes,
     async (xgovBox: Uint8Array) => {
@@ -65,11 +67,13 @@ export async function getSubscribedXgovs({
       // see top - subscribed is at offset 48, length 8
       const subscribedRound = decodeUint64(value.slice(48, 56), "safe");
 
-      if (subscribedRound <= cutoffBlock) {
+      // TODO is subscription at exactly cutoff eligible or not?
+      // 3M range is [) end-exclusive so I think not
+      if (subscribedRound < cutoffBlock) {
         if (config.verbose) {
           console.log(`xGov subscribed at ${subscribedRound} ${address}`);
         }
-        xGovs.push(address);
+        xGovs[address] = subscribedRound;
       } else {
         ignored++;
         if (verbose) {
@@ -89,7 +93,7 @@ export async function getSubscribedXgovs({
   }
 
   console.log(
-    `Found ${xGovs.length} xGovs subscribed before cutoff round ${cutoffBlock}`
+    `Found ${Object.keys(xGovs).length} xGovs subscribed before cutoff round ${cutoffBlock}`
   );
 
   return xGovs;
@@ -98,7 +102,7 @@ export async function getSubscribedXgovs({
 export async function loadSubscribedXgovs(
   fromBlock: number,
   toBlock: number
-): Promise<string[] | undefined> {
+): Promise<XGovsRecord | undefined> {
   const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
 
@@ -106,7 +110,7 @@ export async function loadSubscribedXgovs(
     process.stderr.write(`Trying to load ${label} cache ${filePath}`);
     try {
       const fileContents = (await readFile(filePath)).toString();
-      const subscribed = JSON.parse(fileContents) as string[];
+      const subscribed = JSON.parse(fileContents) as XGovsRecord;
       clearLine();
       console.log(`\rUsing cached ${label} file: ${filePath}`);
       return subscribed;
@@ -119,7 +123,7 @@ export async function loadSubscribedXgovs(
 export async function saveSubscribedXgovs(
   fromBlock: number,
   toBlock: number,
-  subscribed: string[]
+  subscribed: XGovsRecord
 ): Promise<void> {
   await ensureCacheSubPathExists(cacheSubPath);
 
