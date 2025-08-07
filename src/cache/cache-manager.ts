@@ -1,5 +1,4 @@
 import { join } from "path";
-import { networkIDs, NetworkIDs } from "../algod";
 import { CACHE_MAX_PAGES, CACHE_PAGE_SIZE, CachePage } from "./cache-page";
 import { getCachePath } from "./utils";
 import { fsExists, sleep } from "../utils";
@@ -16,8 +15,8 @@ export class CacheManager {
   loading = new Map<number, Promise<CachePage>>();
   shuttingDown = false;
 
-  constructor(networkIDs: NetworkIDs, maxPages = CACHE_MAX_PAGES) {
-    this.cachePath = getCachePath(networkIDs);
+  constructor(maxPages = CACHE_MAX_PAGES) {
+    this.cachePath = getCachePath("blocks");
     this.maxPages = maxPages;
   }
 
@@ -95,6 +94,10 @@ export class CacheManager {
     );
   }
 
+  hasDirty() {
+    return [...this.pages.values()].some((p) => p.dirty);
+  }
+
   async evictPage() {
     if (this.numPages > this.maxPages) {
       const [pageStart, page] = this.oldestPage;
@@ -132,7 +135,7 @@ export class CacheManager {
   }
 }
 
-export const cacheManager = new CacheManager(networkIDs);
+export const cacheManager = new CacheManager();
 
 for (const sig of [
   "SIGTERM",
@@ -143,12 +146,14 @@ for (const sig of [
 ]) {
   process.on(sig, gracefulExit);
   async function gracefulExit() {
-    console.log("\nFlushing data to disk before exit");
-    try {
-      await cacheManager.evictAllPages();
-      console.log("OK");
-    } catch (e) {
-      console.error("While shutting down:", e);
+    if (cacheManager.hasDirty()) {
+      console.log("\nFlushing data to disk before exit");
+      try {
+        await cacheManager.evictAllPages();
+        console.log("OK");
+      } catch (e) {
+        console.error("While shutting down:", e);
+      }
     }
     process.exit(0);
   }
