@@ -1,6 +1,8 @@
 import { decodeAddress } from "algosdk";
 import { Committee } from "./committee";
 import { isEqual } from "./utils";
+import Ajv from "ajv"
+import { committeeSchema } from "./committee-schema";
 
 export function validateCommitteeString(committeeStr: string): Committee {
   // no whitespace in committee
@@ -14,8 +16,10 @@ export function validateCommitteeString(committeeStr: string): Committee {
     throw new Error(`Committee JSON was invalid: ${(e as Error).message}`);
   }
 
-  // validate overall schema
-  // validate(data, committeeSchema)
+  const validate = new Ajv().compile(committeeSchema)
+  if (!validate(committee)) {
+    throw new Error(`Committee JSON did not pass schema validation: ${validate.errors!.map(e => e.message)}`)
+  }
 
   // validate xGov array is sorted lex by address
   const xgovAddress = committee.xGovs.map(({ address }) => address);

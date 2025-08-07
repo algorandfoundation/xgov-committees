@@ -1,4 +1,6 @@
-export const committeeSchema = { 
+import type { JSONSchema7 } from 'json-schema';
+
+export const committeeSchema: JSONSchema7 = { 
   "title": "xGov Committee",
   "description": "Selected xGov Committee with voting power and validity",
   "type": "object",

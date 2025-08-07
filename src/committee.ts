@@ -9,6 +9,7 @@ import { clearLine, fsExists, isEqual } from "./utils";
 import { committeeSchema } from "./committee-schema";
 import { validate } from "json-schema";
 import { validateCommitteeString } from "./committee-validate";
+import { XGovsRecord } from "./subscribed-xgovs";
 
 export type Committee = {
   networkGenesisHash: string;
@@ -34,13 +35,14 @@ export function getCommittee(
   toBlock: number,
   registryAppId: number,
   candidateCommittee: CandidateCommittee,
-  subscribedxGovs: string[]
+  subscribedxGovs: XGovsRecord,
 ): Committee {
   let totalMembers = 0;
   let totalVotes = 0;
+  const subscribed = Object.keys(subscribedxGovs)
 
   const xGovs = Object.entries(candidateCommittee)
-    .filter(([proposer]) => subscribedxGovs.includes(proposer))
+    .filter(([proposer]) => subscribed.includes(proposer))
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([address, votes]) => {
       totalMembers += 1;
@@ -48,7 +50,7 @@ export function getCommittee(
       return { address, votes };
     });
 
-  return {
+  const committee = {
     networkGenesisHash: networkMetadata.genesisHash,
     periodEnd: toBlock,
     periodStart: fromBlock,
@@ -57,6 +59,10 @@ export function getCommittee(
     totalVotes,
     xGovs,
   };
+
+  validateCommitteeString(JSON.stringify(committee))
+
+  return committee
 }
 
 export async function loadCommittee(
@@ -73,10 +79,10 @@ export async function loadCommittee(
       const committee = validateCommitteeString(fileContents);
       clearLine();
       console.log(`\rUsing cached ${label} file: ${filePath}`);
+      console.log(`Committee file is valid`);
       return committee;
     } catch (e) {
-      console.error(`\n${(e as Error).message}`);
-      console.warn(`Ignoring cached ${label} file`);
+      console.warn(`Ignoring cached ${label} file: ${(e as Error).message}`);
     }
   }
 }

@@ -85,7 +85,7 @@ export const getBlock = async (rnd: number): Promise<BlockHeader> => {
       console.log("Refetching: ", rnd);
     }
   }
-  const data = await algod.block(rnd).do();
+  const data = await algod.block(rnd).headerOnly(true).do()
   setCache(rnd, data.block.header);
   return data.block.header;
 };
