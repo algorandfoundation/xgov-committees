@@ -6,17 +6,26 @@ import {
   loadCandidateCommittee,
   saveCandidateCommittee,
 } from "./candidate-committee";
-import { getCommittee, loadCommittee, saveCommittee } from "./committee";
+import {
+  getCommittee,
+  getCommitteeID,
+  loadCommittee,
+  saveCommittee,
+} from "./committee";
 import { config } from "./config";
 import { getBlockProposers, loadProposers, saveProposers } from "./proposers";
-import { getSubscribedXgovs, loadSubscribedXgovs, saveSubscribedXgovs } from "./subscribed-xgovs";
+import {
+  getSubscribedXgovs,
+  loadSubscribedXgovs,
+  saveSubscribedXgovs,
+} from "./subscribed-xgovs";
 import { makeRndsArray } from "./utils";
 
 await ensureCacheSubPathExists("blocks");
 
 const { fromBlock, toBlock, registryAppId } = config;
 
-let committee = await loadCommittee(fromBlock, toBlock)
+let committee = await loadCommittee(fromBlock, toBlock);
 
 if (!committee) {
   let candidateCommittee = await loadCandidateCommittee(fromBlock, toBlock);
@@ -36,13 +45,21 @@ if (!committee) {
     saveCandidateCommittee(fromBlock, toBlock, candidateCommittee);
   }
 
-  let subscribedxGovs = await loadSubscribedXgovs(fromBlock, toBlock)
+  let subscribedxGovs = await loadSubscribedXgovs(fromBlock, toBlock);
   if (!subscribedxGovs) {
-    subscribedxGovs = await getSubscribedXgovs()
-    await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs)
+    subscribedxGovs = await getSubscribedXgovs();
+    await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs);
   }
 
-  committee = getCommittee(fromBlock, toBlock, registryAppId, candidateCommittee, subscribedxGovs)
-  await saveCommittee(fromBlock, toBlock, committee)
+  committee = getCommittee(
+    fromBlock,
+    toBlock,
+    registryAppId,
+    candidateCommittee,
+    subscribedxGovs
+  );
+  await saveCommittee(fromBlock, toBlock, committee);
 }
 
+const committeeID = getCommitteeID(committee);
+console.log("Committee ID:", committeeID);

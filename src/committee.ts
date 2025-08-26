@@ -2,12 +2,9 @@ import { join } from "path";
 import { ensureCacheSubPathExists as ensureCacheSubPathExists } from "./cache";
 import { getCachePath } from "./cache/utils";
 import { readFile, writeFile } from "fs/promises";
-import { config } from "./config";
 import { networkMetadata } from "./algod";
 import { CandidateCommittee } from "./candidate-committee";
-import { clearLine, fsExists, isEqual } from "./utils";
-import { committeeSchema } from "./committee-schema";
-import { validate } from "json-schema";
+import { clearLine, fsExists, sha512_256_raw } from "./utils";
 import { validateCommitteeString } from "./committee-validate";
 import { XGovsRecord } from "./subscribed-xgovs";
 
@@ -99,4 +96,16 @@ export async function saveCommittee(
   console.log(`Writing ${label} to ${filePath}`);
 
   await writeFile(filePath, JSON.stringify(committee));
+}
+
+export function getCommitteeID(committee: Committee): string {
+  // An xGov Committee is identified by the following identifier:
+  // `SHA-512/256(arc0086||SHA-512/256(xGov Committee JSON))`
+  const committeeJSON = JSON.stringify(committee)
+  const committeeJSONHash = sha512_256_raw(committeeJSON)
+  const committeeIDHash = sha512_256_raw(Buffer.concat([
+    Buffer.from("arc0086"),
+    committeeJSONHash
+  ]))
+  return committeeIDHash.toString("base64")
 }
