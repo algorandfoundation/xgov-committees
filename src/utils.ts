@@ -1,5 +1,6 @@
 import { access } from "fs/promises";
 import { constants } from "fs";
+import { sha512_256 } from "js-sha512";
 
 export async function fsExists(path: string) {
   try {
@@ -50,4 +51,8 @@ export function clearLine() {
 
 export function isEqual(a: any[], b: any[]) {
   return a.every((v, k) => b[k] === v)
+}
+
+export function sha512_256_raw(input: string | Buffer) {
+  return Buffer.from(sha512_256(input), "hex")
 }
