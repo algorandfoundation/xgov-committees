@@ -39,6 +39,7 @@ Assuming you have git-lfs installed, you should see this terse output as the cac
 ```bash
 Using cached committee file: data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/50000000-53000000.json
 Committee file is valid
+Committee ID: YdwWoYDvsAd4F2Ws/dXSt4sTqUwOelMLxcT3R0jlrFE=
 ```
 
 To recreate the data from an archival node, you can specify a cache directory override with `-d`:
@@ -62,7 +63,7 @@ Fetching block:	50001809 1818/3000000 0.06% 46.72 rnd/sec ETA 17h 49m
 
 After 1000 blocks have been fetched, the script will periodically report the speed in rounds per second, as well as a rough time estimate.
 
-> ⚠️ **Warning**: This projects defaults to using the Nodely free tier archival services, but due to the number of requests involved in fetching all 3 million block headers, the free tier quota will be reached several times during this process, and the script will exit. We recommend running with an archival node you have unlimited access to.
+> ⚠️ **Warning**: The default node configuration uses the Nodely free tier archival services, but due to the number of requests involved in fetching all 3 million block headers, the free tier quota will be reached several times during this process, and the script will exit. We recommend running with an archival node you have unlimited access to.
 
 After all blocks are fetched:
 
@@ -70,6 +71,7 @@ After all blocks are fetched:
 - the candidate committee data will be generated
 - eligible xGovs will be queried from the registry contract
 - the committee file will be generated
+- the committee ID will be calculated and displayed
 
 Sample output (during proposer data aggregation)
 
@@ -81,16 +83,17 @@ Sample output, successful exit:
 
 ```
 Proposer data:  3000000 OK                                                    
-Writing proposers to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/proposers/49488000-52488000.jsons
-Writing candidate committee to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/candidate-committee/49488000-52488000.json
-Found 96 xGovs. Querying subscription rounds. Cutoff_block=52488000 
-Ignoring 1 xGov(s) that subscribed after the cutoff round (52488000)
-Found 95 xGovs subscribed before cutoff round 52488000
-Writing subscribed xGovs to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/subscribed-xGovs/49488000-52488000.json
-Writing committee to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/49488000-52488000.json
+Writing proposers to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/proposers/50000000-53000000.jsons
+Writing candidate committee to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/candidate-committee/50000000-53000000.json
+Found XX xGovs. Querying subscription rounds. Cutoff_block=53000000 
+Ignoring Y xGov(s) that subscribed after the cutoff round (53000000)
+Found XY xGovs subscribed before cutoff round 53000000
+Writing subscribed xGovs to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/subscribed-xGovs/50000000-53000000.json
+Writing committee to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/50000000-53000000.json
+Committee ID: YdwWoYDvsAd4F2Ws/dXSt4sTqUwOelMLxcT3R0jlrFE=
 ```
 
-You can then find the committee file at the path specified by the last line - `Writing committee to ...`
+You can then find the committee file at the path specified by the second to last line - `Writing committee to ...`
 
 ## Configuration
 
@@ -148,7 +151,7 @@ This would be equivalent to running with explicit command line arguments:
 
 ## Cached data
 
-Cached data is separated by network. Mainnet data will be found by default under:
+Cached data is separated by network. The default mainnet data directory is:
 
 `data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_`
 
