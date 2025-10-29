@@ -10,6 +10,7 @@ Requirements:
 
 - **Git-LFs**
   - This repo utilizes Git-LFS to distribute the data/ directory containing block headers, intermediate data and the committee files. See [git-lfs.com](https://git-lfs.com/) for installation instructions.
+  - If you have cloned the repo before installing LFS, you can run `git lfs install` and `git lfs pull` to hydrate the data directory.
 - nodejs v18+
 
 Install npm package requirements:
