@@ -19,7 +19,7 @@ import {
   loadSubscribedXgovs,
   saveSubscribedXgovs,
 } from "./subscribed-xgovs";
-import { makeRndsArray } from "./utils";
+import { makeRndsArray, committeeIdToSafeFileName } from "./utils";
 
 await ensureCacheSubPathExists("blocks");
 
@@ -62,4 +62,6 @@ if (!committee) {
 }
 
 const committeeID = getCommitteeID(committee);
+const safeCommitteeID = committeeIdToSafeFileName(committeeID);
+console.log("Safe committee filename:", safeCommitteeID);
 console.log("Committee ID:", committeeID);

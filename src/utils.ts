@@ -56,3 +56,12 @@ export function isEqual(a: any[], b: any[]) {
 export function sha512_256_raw(input: string | Buffer) {
   return Buffer.from(sha512_256(input), "hex")
 }
+
+export function committeeIdToSafeFileName(committeeId: Buffer): string {
+  // Use base64url encoding (base64 without padding, using URL-safe characters)
+  return committeeId.toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
