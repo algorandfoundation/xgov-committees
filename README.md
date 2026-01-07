@@ -4,6 +4,20 @@ Repo to produce the [xGov](https://xgov.algorand.co) [committee file](https://ar
 
 The data used to create the committee is provided for your convenience, but you can also recreate all of it by specifying a new cache directory.
 
+## Committee Files
+
+Links to Mainnet committee files, along with their generated committee IDs:
+
+<!-- BEGIN COMMITTEE AUTOGEN -->
+
+- 50000000-53000000: [YdwWoYDvsAd4F2Ws/dXSt4sTqUwOelMLxcT3R0jlrFE=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/50000000-53000000.json)
+- 51000000-54000000: [Uk0nkuGWyT2b2zlsRSwZGl8Sp6tflAwWEuFo0Ouc3H4=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/51000000-54000000.json)
+- 52000000-55000000: [VfCa8q9E/gw9tKfVrlCOrmtOrXi4FimPF9v2sD1nlAA=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/52000000-55000000.json)
+- 53000000-56000000: [RRkptkcDDa5miKXHtJHo55JY4I4lg8xKZN85FuxF8K0=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/53000000-56000000.json)
+- 54000000-57000000: [efqI2KyJAXQbD+WqSkSiqEmnepXNVhWT2dIIX0OJzvg=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/54000000-57000000.json)
+
+<!-- END COMMITTEE AUTOGEN -->
+
 ## Setup
 
 Requirements:
