@@ -6,7 +6,7 @@ The data used to create the committee is provided for your convenience, but you 
 
 ## Committee Files
 
-Links to Mainnet committee files, along with their generated committee IDs:
+Links to Mainnet committee files. `{period start round}-{period end round}: {committee ID}`
 
 <!-- BEGIN COMMITTEE AUTOGEN -->
 
