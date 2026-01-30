@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-tsx src/index.ts $@
+npx tsx src/index.ts $@
