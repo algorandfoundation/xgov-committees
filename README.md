@@ -15,6 +15,7 @@ Links to Mainnet committee files. `{period start round}-{period end round}: {com
 - 52000000-55000000: [VfCa8q9E/gw9tKfVrlCOrmtOrXi4FimPF9v2sD1nlAA=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/52000000-55000000.json)
 - 53000000-56000000: [RRkptkcDDa5miKXHtJHo55JY4I4lg8xKZN85FuxF8K0=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/53000000-56000000.json)
 - 54000000-57000000: [efqI2KyJAXQbD+WqSkSiqEmnepXNVhWT2dIIX0OJzvg=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/54000000-57000000.json)
+- 55000000-58000000: [4ffYWWJh6jouRH0x6Re9oEbmWu40K9F8ukhRQ1teCpQ=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/55000000-58000000.json)
 
 <!-- END COMMITTEE AUTOGEN -->
 
