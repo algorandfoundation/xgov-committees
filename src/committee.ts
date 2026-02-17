@@ -7,6 +7,11 @@ import { CandidateCommittee } from "./candidate-committee";
 import { clearLine, fsExists, sha512_256_raw } from "./utils";
 import { validateCommitteeString } from "./committee-validate";
 import { XGovsRecord } from "./subscribed-xgovs";
+import {
+  getKeyWithNetworkMetadata,
+  getPublicUrlForObject,
+  uploadData,
+} from "./cache/s3-utils";
 
 export type Committee = {
   networkGenesisHash: string;
@@ -36,7 +41,7 @@ export function getCommittee(
 ): Committee {
   let totalMembers = 0;
   let totalVotes = 0;
-  const subscribed = Object.keys(subscribedxGovs)
+  const subscribed = Object.keys(subscribedxGovs);
 
   const xGovs = Object.entries(candidateCommittee)
     .filter(([proposer]) => subscribed.includes(proposer))
@@ -57,15 +62,39 @@ export function getCommittee(
     xGovs,
   };
 
-  validateCommitteeString(JSON.stringify(committee))
+  validateCommitteeString(JSON.stringify(committee));
 
-  return committee
+  return committee;
 }
 
 export async function loadCommittee(
   fromBlock: number,
-  toBlock: number
+  toBlock: number,
+  from: "local" | "s3" = "local",
 ): Promise<Committee | undefined> {
+  if (from === "s3") {
+    const url = getPublicUrlForObject(
+      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
+    );
+
+    try {
+      const res = await fetch(url);
+      console.log(`Trying to fetch committee from S3 URL: ${url}`);
+      if (res.status === 404) {
+        console.log(`Committee not found at S3 URL: ${url}`);
+        return;
+      }
+      if (!res.ok) throw new Error(`Fetching ${url} failed: ${res.status}`);
+      const text = await res.text();
+      const committee = validateCommitteeString(text);
+      console.log(`Using cached S3 committee: ${url}`);
+      return committee;
+    } catch (e) {
+      console.warn(`S3 fetch failed for ${url}: ${(e as Error).message}`);
+      return;
+    }
+  }
+
   const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
 
@@ -87,8 +116,17 @@ export async function loadCommittee(
 export async function saveCommittee(
   fromBlock: number,
   toBlock: number,
-  committee: Committee
+  committee: Committee,
+  to: "local" | "s3" = "local",
 ): Promise<void> {
+  if (to === "s3") {
+    const key = getKeyWithNetworkMetadata(
+      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
+    );
+
+    return await uploadData(key, JSON.stringify(committee));
+  }
+
   await ensureCacheSubPathExists(cacheSubPath);
 
   const cachePath = getCachePath(cacheSubPath);
@@ -101,11 +139,10 @@ export async function saveCommittee(
 export function getCommitteeID(committee: Committee): string {
   // An xGov Committee is identified by the following identifier:
   // `SHA-512/256(arc0086||SHA-512/256(xGov Committee JSON))`
-  const committeeJSON = JSON.stringify(committee)
-  const committeeJSONHash = sha512_256_raw(committeeJSON)
-  const committeeIDHash = sha512_256_raw(Buffer.concat([
-    Buffer.from("arc0086"),
-    committeeJSONHash
-  ]))
-  return committeeIDHash.toString("base64")
+  const committeeJSON = JSON.stringify(committee);
+  const committeeJSONHash = sha512_256_raw(committeeJSON);
+  const committeeIDHash = sha512_256_raw(
+    Buffer.concat([Buffer.from("arc0086"), committeeJSONHash]),
+  );
+  return committeeIDHash.toString("base64");
 }

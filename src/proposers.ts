@@ -5,8 +5,12 @@ import { writeFile, readFile } from "fs/promises";
 import { join } from "path";
 import { ensureCacheSubPathExists } from "./cache";
 import { getCachePath } from "./cache/utils";
-import { cacheManager } from "./cache/cache-manager";
 import { CACHE_PAGE_SIZE } from "./cache/cache-page";
+import {
+  getKeyWithNetworkMetadata,
+  getPublicUrlForObject,
+  uploadData,
+} from "./cache/s3-utils";
 
 export type ProposerMap = Map<string, number[]>;
 
@@ -39,10 +43,10 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
         processed++;
         const percent = ((100 * processed) / total).toFixed(2);
         process.stdout.write(
-          `\rBlock proposer:\t${rnd} ${processed}/${total} ${percent}%   `
+          `\rBlock proposer:\t${rnd} ${processed}/${total} ${percent}%   `,
         );
       },
-      { concurrency: 100 }
+      { concurrency: 100 },
     );
     await sleep(50); // pause for gb
   }
@@ -58,8 +62,64 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
  */
 export async function loadProposers(
   fromBlock: number,
-  toBlock: number
+  toBlock: number,
+  from: "local" | "s3" = "local",
 ): Promise<ProposerMap | undefined> {
+  if (from === "s3") {
+    const url = getPublicUrlForObject(
+      `${cacheSubPath}/${fromBlock}-${toBlock}.jsons`,
+    );
+
+    try {
+      const res = await fetch(url);
+      if (res.status === 404) return;
+      if (!res.ok) throw new Error(`Fetching ${url} failed: ${res.status}`);
+      const fileContents = await res.text();
+
+      const map: ProposerMap = new Map();
+      const lines = fileContents.split("\n").filter(Boolean);
+      let lineNum = 0;
+      for (const line of lines) {
+        const propRnds = JSON.parse(line);
+        const proposer = Object.keys(propRnds)[0];
+        if (!proposer) {
+          throw new Error(`No proposer found in line ${lineNum} in ${url}`);
+        }
+        if (map.has(proposer)) {
+          throw new Error(
+            `Duplicate proposer ${proposer} found in line ${lineNum} in ${url}`,
+          );
+        }
+        map.set(proposer, propRnds[proposer]);
+        lineNum++;
+      }
+
+      const expectedRounds = new Set(makeRndsArray(fromBlock, toBlock));
+      for (const [proposer, rnds] of map.entries()) {
+        for (const rnd of rnds) {
+          if (!expectedRounds.has(rnd)) {
+            throw new Error(
+              `Unexpected or duplicate round ${rnd} found for proposer ${proposer} in ${url}`,
+            );
+          }
+          expectedRounds.delete(rnd);
+        }
+      }
+
+      if (expectedRounds.size) {
+        const rndsStr = [...expectedRounds.values()].join(" ");
+        throw new Error(
+          `Proposers cache incomplete, missing rounds: ${rndsStr}`,
+        );
+      }
+
+      console.log(`Using S3 proposers: ${url}`);
+      return map;
+    } catch (e) {
+      console.warn(`S3 fetch failed for ${url}: ${(e as Error).message}`);
+      return;
+    }
+  }
   const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.jsons`);
 
@@ -78,12 +138,12 @@ export async function loadProposers(
         const proposer = Object.keys(propRnds)[0];
         if (!proposer) {
           throw new Error(
-            `No proposer found in line ${lineNum} in ${filePath}`
+            `No proposer found in line ${lineNum} in ${filePath}`,
           );
         }
         if (map.has(proposer)) {
           throw new Error(
-            `Duplicate proposer ${proposer} found in line ${lineNum} in ${filePath}`
+            `Duplicate proposer ${proposer} found in line ${lineNum} in ${filePath}`,
           );
         }
         map.set(proposer, propRnds[proposer]);
@@ -98,7 +158,7 @@ export async function loadProposers(
         for (const rnd of rnds) {
           if (!expectedRounds.has(rnd)) {
             throw new Error(
-              `Unexpected or duplicate round ${rnd} found for proposer ${proposer} in ${filePath}`
+              `Unexpected or duplicate round ${rnd} found for proposer ${proposer} in ${filePath}`,
             );
           }
           expectedRounds.delete(rnd);
@@ -109,7 +169,7 @@ export async function loadProposers(
       if (expectedRounds.size) {
         const rndsStr = [...expectedRounds.values()].join(" ");
         throw new Error(
-          `Proposers cache incomplete, missing rounds: ${rndsStr}`
+          `Proposers cache incomplete, missing rounds: ${rndsStr}`,
         );
       }
       clearLine();
@@ -127,8 +187,17 @@ export async function loadProposers(
 export async function saveProposers(
   fromBlock: number,
   toBlock: number,
-  proposers: ProposerMap
+  proposers: ProposerMap,
+  to: "local" | "s3" = "local",
 ) {
+  if (to === "s3") {
+    const key = getKeyWithNetworkMetadata(
+      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
+    );
+
+    return await uploadData(key, serializeProposers(proposers));
+  }
+
   const cachePath = getCachePath(cacheSubPath);
   await ensureCacheSubPathExists(cacheSubPath);
 

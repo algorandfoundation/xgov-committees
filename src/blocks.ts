@@ -17,14 +17,14 @@ export const getBlocks = async (rnds: number[]) => {
   console.log(`Network:\t${networkMetadata.genesisID}`);
   console.log(`Registry app:\t${config.registryAppId}`);
   console.log(`Node:   \t${config.algodServer}`);
-  console.log(`Token:  \t${config.algodToken ? "Yes":"No"}`)
+  console.log(`Token:  \t${config.algodToken ? "Yes" : "No"}`);
   console.log(`First block:\t${startBlock}`);
   console.log(`Last block:\t${endBlock}`);
-  console.log("--")
+  console.log("--");
   console.log(`Total blocks:\t${total}`);
   console.log(`Existing:\t${processed}`);
   console.log(`Remaining:\t${total - processed}`);
-  console.log("--")
+  console.log("--");
 
   const chunks = chunk(requiredRnds, 1_000);
   for (const chunk of chunks) {
@@ -56,7 +56,7 @@ export const getBlocks = async (rnds: number[]) => {
     process.stdout.write(
       `\rFetching block:\t${rnd} ${processed}/${total} ${percent}%${
         v ? ` ${v} rnd/sec ETA ${formatDuration(etaSec)}        ` : ""
-      }`
+      }`,
     );
     return data;
   }
@@ -75,17 +75,34 @@ export const getBlock = async (rnd: number): Promise<BlockHeader> => {
       const actualGenesisHash = Buffer.from(genesisHash).toString("base64");
       if (actualGenesisHash !== networkMetadata.genesisHash) {
         throw new Error(
-          `Unexpected genesis hash, found ${actualGenesisHash}, expected ${networkMetadata.genesisHash}`
+          `Unexpected genesis hash, found ${actualGenesisHash}, expected ${networkMetadata.genesisHash}`,
         );
       }
 
       return cached;
     } catch (e) {
       console.error(`Error in cached file ${rnd}:`, (e as Error).message);
+
+      // In use-cache mode, don't refetch - fail fast
+      if (config.cacheMode === "use-cache") {
+        throw new Error(
+          `Block ${rnd} is corrupted in S3 cache and cannot be refetched in use-cache mode`,
+        );
+      }
+
       console.log("Refetching: ", rnd);
     }
   }
-  const data = await algod.block(rnd).headerOnly(true).do()
+
+  // In use-cache mode, block should be in cache - fail if not found
+  if (config.cacheMode === "use-cache") {
+    throw new Error(
+      `Block ${rnd} not found in S3 cache. All blocks must be pre-cached when using use-cache mode.`,
+    );
+  }
+
+  // For other modes, fetch from algod and cache it
+  const data = await algod.block(rnd).headerOnly(true).do();
   setCache(rnd, data.block.header);
   return data.block.header;
 };

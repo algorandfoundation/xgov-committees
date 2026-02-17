@@ -1,5 +1,5 @@
 import { decodeUint64, encodeAddress } from "algosdk";
-import { algod } from "./algod";
+import { algod, networkMetadata } from "./algod";
 import { config } from "./config";
 import pMap from "p-map";
 import { getCachePath } from "./cache/utils";
@@ -7,6 +7,11 @@ import { ensureCacheSubPathExists } from "./cache";
 import { join } from "path";
 import { readFile, writeFile } from "fs/promises";
 import { clearLine, fsExists } from "./utils";
+import {
+  getKeyWithNetworkMetadata,
+  getPublicUrlForObject,
+  uploadData,
+} from "./cache/s3-utils";
 
 /*
     Gets subscribed xGovs from registry contract
@@ -20,7 +25,7 @@ import { clearLine, fsExists } from "./utils";
         subscription_round: arc4.UInt64         48      8
 */
 
-export type XGovsRecord = Record<string, number>
+export type XGovsRecord = Record<string, number>;
 
 const label = "subscribed xGovs";
 const cacheSubPath = "subscribed-xGovs";
@@ -51,7 +56,7 @@ export async function getSubscribedXgovs({
     .filter(({ name }) => name[0] === xgovBoxPrefix)
     .map(({ name }) => name);
   console.log(
-    `Found ${xgovBoxes.length} xGovs. Querying subscription rounds. Cutoff_block=${cutoffBlock} `
+    `Found ${xgovBoxes.length} xGovs. Querying subscription rounds. Cutoff_block=${cutoffBlock} `,
   );
 
   let ignored = 0;
@@ -78,22 +83,22 @@ export async function getSubscribedXgovs({
         ignored++;
         if (verbose) {
           console.warn(
-            `Ignoring xGov subscribed (${subscribedRound}) after cutoff (${cutoffBlock}): ${address}`
+            `Ignoring xGov subscribed (${subscribedRound}) after cutoff (${cutoffBlock}): ${address}`,
           );
         }
       }
     },
-    { concurrency }
+    { concurrency },
   );
 
   if (ignored) {
     console.log(
-      `Ignoring ${ignored} xGov(s) that subscribed after the cutoff round (${cutoffBlock})`
+      `Ignoring ${ignored} xGov(s) that subscribed after the cutoff round (${cutoffBlock})`,
     );
   }
 
   console.log(
-    `Found ${Object.keys(xGovs).length} xGovs subscribed before cutoff round ${cutoffBlock}`
+    `Found ${Object.keys(xGovs).length} xGovs subscribed before cutoff round ${cutoffBlock}`,
   );
 
   return xGovs;
@@ -101,8 +106,26 @@ export async function getSubscribedXgovs({
 
 export async function loadSubscribedXgovs(
   fromBlock: number,
-  toBlock: number
+  toBlock: number,
+  from: "local" | "s3" = "local",
 ): Promise<XGovsRecord | undefined> {
+  if (from === "s3") {
+    const url = getPublicUrlForObject(
+      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
+    );
+
+    try {
+      const res = await fetch(url);
+      if (res.status === 404) return;
+      if (!res.ok) throw new Error(`Fetching ${url} failed: ${res.status}`);
+      const subscribed = await res.json();
+      console.log(`Using cached S3 subscribed-xGovs: ${url}`);
+      return subscribed as XGovsRecord;
+    } catch (e) {
+      console.warn(`S3 fetch failed for ${url}: ${(e as Error).message}`);
+      return;
+    }
+  }
   const cachePath = getCachePath(cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
 
@@ -115,7 +138,7 @@ export async function loadSubscribedXgovs(
       console.log(`\rUsing cached ${label} file: ${filePath}`);
       return subscribed;
     } catch (e) {
-      console.warn(`\nIgnoring ${label} file: ${(e as Error).message}`);
+      console.warn(`\nIgnoring cached ${label} file: ${(e as Error).message}`);
     }
   }
 }
@@ -123,8 +146,17 @@ export async function loadSubscribedXgovs(
 export async function saveSubscribedXgovs(
   fromBlock: number,
   toBlock: number,
-  subscribed: XGovsRecord
+  subscribed: XGovsRecord,
+  to: "local" | "s3" = "local",
 ): Promise<void> {
+  if (to === "s3") {
+    const key = getKeyWithNetworkMetadata(
+      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
+    );
+
+    return await uploadData(key, JSON.stringify(subscribed));
+  }
+
   await ensureCacheSubPathExists(cacheSubPath);
 
   const cachePath = getCachePath(cacheSubPath);
