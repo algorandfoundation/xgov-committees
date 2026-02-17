@@ -45,14 +45,15 @@ export async function fetchPageFromS3(
   const key = getKeyWithNetworkMetadata(`blocks/${pageStart}.json`); // For backward compatibility with old key format
 
   try {
-    const response = await getData(key);
+    const body = await getData(key);
 
-    if (!response.Body) {
+    if (!body) {
       return undefined;
     }
 
-    // Convert stream to string
-    const bodyString = await response.Body.transformToString("utf-8");
+    // Convert stream or string body to string
+    const bodyString =
+      typeof body === "string" ? body : await body.transformToString("utf-8");
     const data = JSON.parse(bodyString) as CachePagePayload;
 
     if (config.verbose) {
