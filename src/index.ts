@@ -64,7 +64,12 @@ if (!committee) {
     }
 
     candidateCommittee = await getCandidateCommittee(proposers);
-    saveCandidateCommittee(fromBlock, toBlock, candidateCommittee, saveTo);
+    await saveCandidateCommittee(
+      fromBlock,
+      toBlock,
+      candidateCommittee,
+      saveTo,
+    );
   }
 
   let subscribedxGovs = await loadSubscribedXgovs(fromBlock, toBlock, loadFrom);

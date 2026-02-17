@@ -1,5 +1,5 @@
 import { decodeUint64, encodeAddress } from "algosdk";
-import { algod, networkMetadata } from "./algod";
+import { algod } from "./algod";
 import { config } from "./config";
 import pMap from "p-map";
 import { getCachePath } from "./cache/utils";

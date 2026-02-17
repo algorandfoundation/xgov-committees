@@ -192,7 +192,7 @@ export async function saveProposers(
 ) {
   if (to === "s3") {
     const key = getKeyWithNetworkMetadata(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
+      `${cacheSubPath}/${fromBlock}-${toBlock}.jsons`,
     );
 
     return await uploadData(key, serializeProposers(proposers));
