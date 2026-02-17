@@ -25,13 +25,19 @@ const {
 let s3Client: S3Client | null = null;
 
 export function getS3Client(): S3Client {
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error(
+      "S3 credentials are not fully configured. Please set S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY in your environment variables.",
+    );
+  }
+
   if (!s3Client) {
     s3Client = new S3Client({
       region: region,
       endpoint: endpoint,
       credentials: {
-        accessKeyId: accessKeyId!,
-        secretAccessKey: secretAccessKey!,
+        accessKeyId: accessKeyId,
+        secretAccessKey: secretAccessKey,
       },
     });
   }
