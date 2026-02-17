@@ -8,7 +8,7 @@ import {
   getKeyWithNetworkMetadata,
   getPublicUrlForObject,
   uploadData,
-} from "./cache/s3-utils";
+} from "./s3";
 
 export type CandidateCommittee = Record<string, number>;
 

@@ -3,6 +3,7 @@ import { CACHE_MAX_PAGES, CACHE_PAGE_SIZE, CachePage } from "./cache-page";
 import { getCachePath } from "./utils";
 import { fsExists, sleep } from "../utils";
 import { config } from "../config";
+import { fetchPageFromS3 } from "./s3-cache";
 
 export function getPageStartRnd(rnd: number) {
   return Math.floor(rnd / CACHE_PAGE_SIZE) * CACHE_PAGE_SIZE;
@@ -49,6 +50,11 @@ export class CacheManager {
   }
 
   async hasPage(pageStart: number): Promise<boolean> {
+    // In use-cache mode, assume page exists and let fetch fail if not
+    if (config.cacheMode === "use-cache") {
+      return true;
+    }
+    // For other modes (write-cache, validate-cache), check filesystem
     return fsExists(this.getBlockCacheFilePath(pageStart));
   }
 
@@ -67,20 +73,34 @@ export class CacheManager {
         try {
           if (config.verbose)
             console.debug(
-              `\nLoading ${pageStart} numPages:${this.numPages} max:${this.maxPages}`
+              `\nLoading ${pageStart} numPages:${this.numPages} max:${this.maxPages}`,
             );
           if (this.numPages > this.maxPages) {
             await this.evictPage();
           }
-          const filename = this.getBlockCacheFilePath(pageStart);
-          const page = await CachePage.loadPage(filename);
+
+          let page: CachePage;
+
+          // In use-cache mode, fetch from S3 and create read-only page
+          if (config.cacheMode === "use-cache") {
+            const s3Data = await fetchPageFromS3(pageStart);
+            if (!s3Data) {
+              throw new Error(`Page ${pageStart} not found in S3 cache`);
+            }
+            page = CachePage.fromS3Data(pageStart, s3Data);
+          } else {
+            // For other modes, load from filesystem
+            const filename = this.getBlockCacheFilePath(pageStart);
+            page = await CachePage.loadPage(filename);
+          }
+
           this.pages.set(pageStart, page);
           this.loading.delete(pageStart);
           resolve(page);
         } catch (e) {
           reject(e);
         }
-      }))
+      })),
     );
     return q;
   }
@@ -90,7 +110,7 @@ export class CacheManager {
       ([leastUsedRnd, leastUsedPage], [rnd, page]) => {
         if (leastUsedPage?.lastAccess > page.lastAccess) return [rnd, page];
         return [leastUsedRnd, leastUsedPage];
-      }
+      },
     );
   }
 
@@ -105,7 +125,7 @@ export class CacheManager {
       this.pages.delete(pageStart);
       if (config.verbose)
         console.debug(
-          `Evicting ${pageStart} numPages:${this.numPages} max:${this.maxPages}`
+          `Evicting ${pageStart} numPages:${this.numPages} max:${this.maxPages}`,
         );
       await sleep(50);
     }

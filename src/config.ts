@@ -23,6 +23,7 @@ export type Config = {
     region?: string;
     bucketName?: string;
     endpoint?: string;
+    publicUrl?: string;
   };
 };
 
@@ -147,6 +148,13 @@ const argvConfig = [
     description: "S3 endpoint URL",
     envVar: "S3_ENDPOINT",
   },
+  {
+    name: "s3-public-url",
+    short: "U",
+    type: "string",
+    description: "S3 public URL endpoint (overrides endpoint for cache reads)",
+    envVar: "S3_PUBLIC_URL",
+  },
 ];
 
 function parseDefault(
@@ -216,5 +224,6 @@ export const config: Config = {
     region: parsedArgs["s3-region"] as string | undefined,
     bucketName: parsedArgs["s3-bucket-name"] as string | undefined,
     endpoint: parsedArgs["s3-endpoint"] as string | undefined,
+    publicUrl: parsedArgs["s3-public-url"] as string | undefined,
   },
 };

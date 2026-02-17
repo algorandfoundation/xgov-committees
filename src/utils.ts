@@ -1,6 +1,7 @@
-import { access } from "fs/promises";
+import { access, readdir } from "fs/promises";
 import { constants } from "fs";
 import { sha512_256 } from "js-sha512";
+import { join } from "path";
 
 export async function fsExists(path: string) {
   try {
@@ -44,24 +45,38 @@ export function makeRndsArray(fromBlock: number, toBlock: number) {
 
 export function clearLine() {
   process.stderr.write(
-    "\r                                                                              "
+    "\r                                                                              ",
   );
   process.stderr.write("\r");
 }
 
 export function isEqual(a: any[], b: any[]) {
-  return a.every((v, k) => b[k] === v)
+  return a.every((v, k) => b[k] === v);
 }
 
 export function sha512_256_raw(input: string | Buffer) {
-  return Buffer.from(sha512_256(input), "hex")
+  return Buffer.from(sha512_256(input), "hex");
 }
 
 export function committeeIdToSafeFileName(committeeId: Buffer): string {
   // Use base64url encoding (base64 without padding, using URL-safe characters)
-  return committeeId.toString("base64")
+  return committeeId
+    .toString("base64")
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 }
 
+export async function walkDir(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...(await walkDir(fullPath)));
+    } else if (entry.isFile()) {
+      out.push(fullPath);
+    }
+  }
+  return out;
+}

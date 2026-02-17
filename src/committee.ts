@@ -11,7 +11,7 @@ import {
   getKeyWithNetworkMetadata,
   getPublicUrlForObject,
   uploadData,
-} from "./cache/s3-utils";
+} from "./s3";
 
 export type Committee = {
   networkGenesisHash: string;
