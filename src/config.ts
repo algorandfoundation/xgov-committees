@@ -3,7 +3,10 @@ import yargs from "yargs";
 import type { PositionalOptionsType } from "yargs";
 import { hideBin } from "yargs/helpers";
 
+type CacheMode = "use-cache" | "validate-cache" | "write-cache";
+
 export type Config = {
+  cacheMode: CacheMode;
   registryAppId: number;
   fromBlock: number;
   toBlock: number;
@@ -13,12 +16,28 @@ export type Config = {
   dataPath: string;
   concurrency: number;
   verbose: boolean;
+
+  s3: {
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    region?: string;
+    bucketName?: string;
+    endpoint?: string;
+  };
 };
 
 // Load environment variables from .env file
 dotenv.config({ quiet: true, path: process.env.ENV });
 
 const argvConfig = [
+  {
+    name: "cache-mode",
+    short: "m",
+    type: "string",
+    description: "run mode: use-cache, validate-cache, write-cache",
+    envVar: "MODE",
+    defaultValue: "use-cache",
+  },
   {
     name: "registry-app-id",
     short: "a",
@@ -91,12 +110,49 @@ const argvConfig = [
     envVar: "VERBOSE",
     defaultValue: false,
   },
+  {
+    name: "s3-access-key-id",
+    short: "K",
+    type: "string",
+    description: "S3 access key ID",
+    envVar: "S3_ACCESS_KEY_ID",
+  },
+  {
+    name: "s3-secret-access-key",
+    short: "W",
+    type: "string",
+    description: "S3 secret access key",
+    envVar: "S3_SECRET_ACCESS_KEY",
+  },
+  {
+    name: "s3-region",
+    short: "R",
+    type: "string",
+    description: "S3 region",
+    envVar: "S3_REGION",
+    defaultValue: "auto",
+  },
+  {
+    name: "s3-bucket-name",
+    short: "B",
+    type: "string",
+    description: "S3 bucket name",
+    envVar: "S3_BUCKET_NAME",
+    defaultValue: "xgov-committees",
+  },
+  {
+    name: "s3-endpoint",
+    short: "E",
+    type: "string",
+    description: "S3 endpoint URL",
+    envVar: "S3_ENDPOINT",
+  },
 ];
 
 function parseDefault(
   type: string,
   value: string | undefined,
-  defaultValue: string | number | boolean | undefined
+  defaultValue: string | number | boolean | undefined,
 ) {
   if (value !== undefined) {
     if (type === "number") {
@@ -113,7 +169,7 @@ function parseDefault(
 const parser = argvConfig.reduce(
   (
     parser,
-    { name, short, type, description, required, envVar, defaultValue }
+    { name, short, type, description, required, envVar, defaultValue },
   ) => {
     return parser.option(name, {
       alias: short,
@@ -123,19 +179,42 @@ const parser = argvConfig.reduce(
       default: parseDefault(type, process.env[envVar], defaultValue),
     });
   },
-  yargs(hideBin(process.argv))
+  yargs(hideBin(process.argv)),
 );
 
-export const config = parser.help().parseSync() as unknown as Config;
+const parsedArgs = parser.help().parseSync();
 
-for(const argvConfigEntry of argvConfig) {
-  const { name, type } = argvConfigEntry
-  if (type !== "number")
-    continue
-  // @ts-ignore - kebabcase is not in type but is the easiest way to access from argvConfig entries
-  const value = config[name]
-  if (isNaN(value)) {
-    console.error(`Configuration value "${name}" expected a number, found non-numeric value`)
-    process.exit(1)
+// Validate numeric values before transformation
+for (const argvConfigEntry of argvConfig) {
+  const { name, type } = argvConfigEntry;
+  if (type !== "number") continue;
+  // @ts-ignore - kebab-case property access
+  const value = parsedArgs[name];
+  if (isNaN(value as number)) {
+    console.error(
+      `Configuration value "${name}" expected a number, found non-numeric value`,
+    );
+    process.exit(1);
   }
 }
+
+// Transform s3-* properties into nested s3 object
+export const config: Config = {
+  cacheMode: parsedArgs["cache-mode"] as CacheMode,
+  registryAppId: parsedArgs["registry-app-id"] as number,
+  fromBlock: parsedArgs["from-block"] as number,
+  toBlock: parsedArgs["to-block"] as number,
+  algodServer: parsedArgs["algod-server"] as string,
+  algodPort: parsedArgs["algod-port"] as number,
+  algodToken: parsedArgs["algod-token"] as string,
+  dataPath: parsedArgs["data-path"] as string,
+  concurrency: parsedArgs["concurrency"] as number,
+  verbose: parsedArgs["verbose"] as boolean,
+  s3: {
+    accessKeyId: parsedArgs["s3-access-key-id"] as string | undefined,
+    secretAccessKey: parsedArgs["s3-secret-access-key"] as string | undefined,
+    region: parsedArgs["s3-region"] as string | undefined,
+    bucketName: parsedArgs["s3-bucket-name"] as string | undefined,
+    endpoint: parsedArgs["s3-endpoint"] as string | undefined,
+  },
+};
