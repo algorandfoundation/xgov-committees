@@ -123,7 +123,7 @@ export async function loadSubscribedXgovs(
       return subscribed as XGovsRecord;
     } catch (e) {
       console.warn(`S3 fetch failed for ${url}: ${(e as Error).message}`);
-      return;
+      throw e;
     }
   }
   const cachePath = getCachePath(cacheSubPath);
