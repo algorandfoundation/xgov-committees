@@ -38,7 +38,7 @@ export async function fetchPageFromS3(
       if (config.verbose) {
         console.debug(`S3 cache miss: ${url}`);
       }
-      return undefined;
+      throw error;
     }
   }
 
