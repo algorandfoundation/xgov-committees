@@ -185,7 +185,7 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
         `committee/${toRound}.json`,
       );
 
-      if (keys.has(shortcutKey)) {
+      if (await objectExists(shortcutKey)) {
         console.log(`Shortcut already exists: ${shortcutKey}`);
         continue;
       }
