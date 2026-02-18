@@ -15,7 +15,7 @@ export class CachePage {
   dirty = false;
   lastAccess: number;
   pending = new Set<Promise<any>>();
-  readOnly: boolean;
+  readonly readOnly: boolean;
 
   constructor({
     filename,
