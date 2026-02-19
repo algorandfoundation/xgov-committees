@@ -2,6 +2,9 @@ import { access, readdir } from "fs/promises";
 import { constants } from "fs";
 import { sha512_256 } from "js-sha512";
 import { join } from "path";
+import { createWriteStream } from "fs";
+import { pipeline } from "stream/promises";
+import { Readable } from "stream";
 
 export async function fsExists(path: string) {
   try {
@@ -79,4 +82,28 @@ export async function walkDir(dir: string): Promise<string[]> {
     }
   }
   return out;
+}
+
+export async function downloadToFile(
+  url: string,
+  filename: string,
+): Promise<void> {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to download ${url}: ${response.status} ${response.statusText}`,
+    );
+  }
+
+  if (!response.body) {
+    throw new Error("Response body is empty");
+  }
+
+  const fileStream = createWriteStream(filename);
+
+  // Convert Web ReadableStream to Node Readable
+  const nodeStream = Readable.fromWeb(response.body as any);
+
+  await pipeline(nodeStream, fileStream);
 }
