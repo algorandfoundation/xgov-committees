@@ -1,3 +1,4 @@
+import { join } from "path";
 import { config } from "../config";
 import {
   getData,
@@ -6,8 +7,66 @@ import {
   objectExists,
   uploadData,
 } from "../s3";
+import { clearLine, downloadToFile, formatDuration } from "../utils";
+import pMap from "p-map";
+import { ensureCacheSubPathExists } from ".";
+import { getCachePath } from "./utils";
 
 export type CachePagePayload = Record<string, string>;
+
+/**
+ * Downloads block pages from S3 with progress tracking. Expected to be multiples of 1000 blocks since each page covers 1000 blocks.
+ * @param fromBlock The starting block number for the download range.
+ * @param toBlock The ending block number for the download range.
+ * @throws Will throw an error if the block range is not valid or on failure.
+ * @return {Promise<void>} Resolves when all pages are downloaded.
+ */
+export async function downloadBlockPages(
+  fromBlock: number,
+  toBlock: number,
+): Promise<void> {
+  const blockCachePath = getCachePath("blocks");
+  await ensureCacheSubPathExists("blocks");
+
+  // Generate array of page start blocks
+  const targetPages = Array.from(
+    { length: (toBlock - fromBlock) / 1000 },
+    (_, i) => fromBlock + i * 1000,
+  );
+
+  // Progress tracking state
+  let downloaded = 0;
+  const total = targetPages.length;
+  const startTime = Date.now();
+
+  await pMap(
+    targetPages,
+    async (pageStart) => {
+      const pageName = `${pageStart}.json`;
+      const url = getPublicUrlForObject(`blocks/${pageName}`);
+      const fileName = join(blockCachePath, pageName);
+
+      await downloadToFile(url, fileName);
+
+      // Update progress
+      downloaded++;
+      const percent = ((100 * downloaded) / total).toFixed(2);
+      const elapsed = (Date.now() - startTime) / 1000;
+      const rate =
+        elapsed > 0
+          ? ` ${(downloaded / elapsed).toFixed(2)} pages/sec ETA ${formatDuration((total - downloaded) / (downloaded / elapsed))}`
+          : "";
+
+      process.stdout.write(
+        `\rDownloading pages:\t${downloaded}/${total} ${percent}%${rate}        `,
+      );
+    },
+    { concurrency: config.concurrency },
+  );
+
+  clearLine();
+  process.stdout.write(`Download complete:\t${total} pages OK\n`);
+}
 
 /**
  * Fetches a cache page from S3.
