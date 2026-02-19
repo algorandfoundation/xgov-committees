@@ -293,6 +293,7 @@ export async function syncDirectory(directoryPath: string) {
           Bucket: bucketName,
           Key: key,
           Body: body,
+          ChecksumAlgorithm: "SHA256",
         }),
       );
 
@@ -318,6 +319,31 @@ export async function syncDirectory(directoryPath: string) {
   console.log(
     `Transferred ${formatBytes(uploadedBytes)} (${formatBytes(bytesPerSec)}/s)`,
   );
+}
+
+export async function getHashForKey(key: string): Promise<string | undefined> {
+  const client = getS3Client();
+
+  try {
+    const response = await client.send(
+      new HeadObjectCommand({ Bucket: bucketName, Key: key }),
+    );
+    return response.ChecksumSHA256;
+  } catch (error) {
+    const err = error as {
+      $metadata?: { httpStatusCode?: number };
+      name?: string;
+      Code?: string;
+    };
+    if (
+      err?.$metadata?.httpStatusCode === 404 ||
+      err?.name === "NotFound" ||
+      err?.Code === "NotFound"
+    ) {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 export async function getData(key: string): Promise<any> {
@@ -361,6 +387,7 @@ export async function uploadData(key: string, data: string): Promise<void> {
       Key: key,
       Body: data,
       ContentType: "application/json",
+      ChecksumAlgorithm: "SHA256",
     }),
   );
 }
