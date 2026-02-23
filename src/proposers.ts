@@ -207,9 +207,16 @@ export async function saveProposers(
   await writeFile(filePath, serializeProposers(proposers));
 }
 
-function serializeProposers(proposers: ProposerMap) {
+export function serializeProposers(proposers: ProposerMap) {
   let s = ``;
-  for (const [proposer, rounds] of proposers.entries()) {
+  // sort proposers for deterministic output
+  for (const [proposer, rounds] of Array.from(proposers.entries()).sort(
+    ([a], [b]) => {
+      const aStr = String(a);
+      const bStr = String(b);
+      return aStr.localeCompare(bStr);
+    },
+  )) {
     s += JSON.stringify({ [proposer]: rounds }) + "\n";
   }
   return s;

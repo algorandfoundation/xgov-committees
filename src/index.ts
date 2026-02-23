@@ -1,3 +1,4 @@
+import pMap from "p-map";
 import { getBlocks } from "./blocks";
 import { ensureCacheSubPathExists, getCachedRounds } from "./cache";
 import { cacheManager } from "./cache/cache-manager";
@@ -14,7 +15,12 @@ import {
   saveCommittee,
 } from "./committee";
 import { config } from "./config";
-import { getBlockProposers, loadProposers, saveProposers } from "./proposers";
+import {
+  getBlockProposers,
+  loadProposers,
+  saveProposers,
+  serializeProposers,
+} from "./proposers";
 import {
   getSubscribedXgovs,
   loadSubscribedXgovs,
@@ -22,7 +28,8 @@ import {
 } from "./subscribed-xgovs";
 import { makeRndsArray, committeeIdToSafeFileName } from "./utils";
 
-import { downloadBlockPages } from "./cache/s3-cache";
+import { downloadBlockPages, validateBlockPage } from "./cache/s3-cache";
+import { CACHE_PAGE_SIZE } from "./cache/cache-page";
 
 const { cacheMode, fromBlock, toBlock, registryAppId } = config;
 
@@ -80,16 +87,17 @@ switch (cacheMode) {
  * @returns {Promise<void>}
  */
 async function useCache(fromBlock: number, toBlock: number): Promise<void> {
-  // range must be multiples of 1000 for page alignment since we are trusting s3 cache and not validating
-  if ((toBlock - fromBlock) % 1000 !== 0) {
+  // range must be multiples of CACHE_PAGE_SIZE for page alignment since we are trusting s3 cache and not validating
+  if ((toBlock - fromBlock) % CACHE_PAGE_SIZE !== 0) {
     throw new Error(
-      `For use-cache mode, fromBlock and toBlock must be multiples of 1000. Got fromBlock=${fromBlock}, toBlock=${toBlock}.`,
+      `For use-cache mode, fromBlock and toBlock must be multiples of ${CACHE_PAGE_SIZE}. Got fromBlock=${fromBlock}, toBlock=${toBlock}.`,
     );
   }
 
   // Download block pages from S3
   await downloadBlockPages(fromBlock, toBlock);
 
+  console.log("Syncing proposers from S3...");
   const proposers = await loadProposers(fromBlock, toBlock, "s3");
   if (!proposers) {
     throw new Error(
@@ -97,7 +105,9 @@ async function useCache(fromBlock: number, toBlock: number): Promise<void> {
     );
   }
   await saveProposers(fromBlock, toBlock, proposers, "local");
+  console.log("Proposers synced successfully.");
 
+  console.log("Syncing subscribed xGovs from S3...");
   const subscribedxGovs = await loadSubscribedXgovs(fromBlock, toBlock, "s3");
   if (!subscribedxGovs) {
     throw new Error(
@@ -105,7 +115,9 @@ async function useCache(fromBlock: number, toBlock: number): Promise<void> {
     );
   }
   await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs, "local");
+  console.log("Subscribed xGovs synced successfully.");
 
+  console.log("Syncing candidate committee from S3...");
   const candidateCommittee = await loadCandidateCommittee(
     fromBlock,
     toBlock,
@@ -117,7 +129,9 @@ async function useCache(fromBlock: number, toBlock: number): Promise<void> {
     );
   }
   await saveCandidateCommittee(fromBlock, toBlock, candidateCommittee, "local");
+  console.log("Candidate committee synced successfully.");
 
+  console.log("Syncing committee from S3...");
   const committee = await loadCommittee(fromBlock, toBlock, "s3");
   if (!committee) {
     throw new Error(
@@ -125,6 +139,7 @@ async function useCache(fromBlock: number, toBlock: number): Promise<void> {
     );
   }
   await saveCommittee(fromBlock, toBlock, committee, "local");
+  console.log("Committee synced successfully.");
 }
 
 /**
@@ -135,20 +150,16 @@ async function useCache(fromBlock: number, toBlock: number): Promise<void> {
  * @returns {Promise<void>}
  */
 async function writeCache(fromBlock: number, toBlock: number): Promise<void> {
-  // TODO: make write-cache reads from S3 and saves to S3 (also saving to disk as needed)
-  const loadFrom = "s3";
-  const saveTo = "s3";
-
-  let committee = await loadCommittee(fromBlock, toBlock, loadFrom);
+  let committee = await loadCommittee(fromBlock, toBlock, "s3");
 
   if (!committee) {
     let candidateCommittee = await loadCandidateCommittee(
       fromBlock,
       toBlock,
-      loadFrom,
+      "s3",
     );
     if (!candidateCommittee) {
-      let proposers = await loadProposers(fromBlock, toBlock, loadFrom);
+      let proposers = await loadProposers(fromBlock, toBlock, "s3");
       if (!proposers) {
         const rnds = makeRndsArray(fromBlock, toBlock);
 
@@ -156,7 +167,7 @@ async function writeCache(fromBlock: number, toBlock: number): Promise<void> {
         await cacheManager.flushAllPages();
 
         proposers = await getBlockProposers(rnds);
-        await saveProposers(fromBlock, toBlock, proposers, saveTo);
+        await saveProposers(fromBlock, toBlock, proposers, "s3");
       }
 
       candidateCommittee = await getCandidateCommittee(proposers);
@@ -164,18 +175,14 @@ async function writeCache(fromBlock: number, toBlock: number): Promise<void> {
         fromBlock,
         toBlock,
         candidateCommittee,
-        saveTo,
+        "s3",
       );
     }
 
-    let subscribedxGovs = await loadSubscribedXgovs(
-      fromBlock,
-      toBlock,
-      loadFrom,
-    );
+    let subscribedxGovs = await loadSubscribedXgovs(fromBlock, toBlock, "s3");
     if (!subscribedxGovs) {
       subscribedxGovs = await getSubscribedXgovs();
-      await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs, saveTo);
+      await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs, "s3");
     }
 
     committee = getCommittee(
@@ -185,7 +192,7 @@ async function writeCache(fromBlock: number, toBlock: number): Promise<void> {
       candidateCommittee,
       subscribedxGovs,
     );
-    await saveCommittee(fromBlock, toBlock, committee, saveTo);
+    await saveCommittee(fromBlock, toBlock, committee, "s3");
 
     // ensure final committee shortcuts are created for latest committee
     await ensureCommitteeShortcuts();
@@ -210,7 +217,15 @@ async function validateCache(
 ): Promise<void> {
   const rnds = makeRndsArray(fromBlock, toBlock);
 
-  await getBlocks(rnds);
+  // must be multiples of CACHE_PAGE_SIZE for proper page alignment
+  if (rnds.length % CACHE_PAGE_SIZE !== 0) {
+    throw new Error(
+      `For cache validation, fromBlock and toBlock must be multiples of ${CACHE_PAGE_SIZE} for proper page alignment. Got fromBlock=${fromBlock}, toBlock=${toBlock}.`,
+    );
+  }
+
+  // pass true for `skipCache` to getBlocks to skip block header cache and force refetch from algod.
+  await getBlocks(rnds, true);
   await cacheManager.flushAllPages();
 
   const existing = await getCachedRounds(fromBlock, toBlock);
@@ -223,25 +238,24 @@ async function validateCache(
     throw new Error(`Cache validation failed! Missing rounds!`);
   }
 
-  // TODO: compare blocks with s3 to ensure cache integrity before validating derived data
-  // for (const rnd of rnds) {
-  //   // get block header
-  //   const block = await getBlock(rnd);
-  //   if (!block) {
-  //     throw new Error(
-  //       `Cache validation failed! Round ${rnd} is missing from cache.`,
-  //     );
-  //   }
+  const numberOfPages = rnds.length / CACHE_PAGE_SIZE;
+  const pageStart = fromBlock;
 
-  //   // TODO: compare with S3 cached block header
-  //   throw new Error(
-  //     `Cache validation failed! S3 block comparison not implemented yet!`,
-  //   );
-  // }
+  // validate all pages by comparing s3 and local MD5 hashes with concurrency
+  await pMap(
+    Array.from({ length: numberOfPages }, (_, i) => i),
+    (pageIndex) =>
+      validateBlockPage(
+        pageStart + pageIndex * CACHE_PAGE_SIZE,
+        pageIndex,
+        numberOfPages,
+      ),
+    { concurrency: config.concurrency },
+  );
 
-  // console.info(
-  //   `Cache validation: All headers from S3 match local headers for blocks ${fromBlock}-${toBlock}.`,
-  // );
+  console.info(
+    `Cache validation: All headers from S3 match local headers for blocks ${fromBlock}-${toBlock}.`,
+  );
 
   // recreate proposers locally
   const proposers = await getBlockProposers(rnds);
@@ -256,11 +270,9 @@ async function validateCache(
     );
   }
 
+  // TODO: fix, this always fails
   // compare s3 and local proposers (sort keys for consistent comparison)
-  if (
-    JSON.stringify(s3Proposers, Object.keys(s3Proposers).sort()) !==
-    JSON.stringify(proposers, Object.keys(proposers).sort())
-  ) {
+  if (serializeProposers(s3Proposers) !== serializeProposers(proposers)) {
     throw new Error(
       `Validation failed! Proposers from S3 does not match local proposers for blocks ${fromBlock}-${toBlock}.`,
     );

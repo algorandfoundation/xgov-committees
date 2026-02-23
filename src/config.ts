@@ -23,7 +23,7 @@ export type Config = {
     region?: string;
     bucketName?: string;
     endpoint?: string;
-    publicUrl?: string;
+    publicUrl: string;
   };
 };
 
@@ -32,12 +32,12 @@ dotenv.config({ quiet: true, path: process.env.ENV });
 
 const argvConfig = [
   {
-    name: "cache-mode",
+    name: "mode",
     short: "m",
     type: "string",
     description: "run mode: use-cache, validate-cache, write-cache",
     envVar: "MODE",
-    defaultValue: "use-cache",
+    required: true,
   },
   {
     name: "registry-app-id",
@@ -154,6 +154,7 @@ const argvConfig = [
     type: "string",
     description: "S3 public URL endpoint (overrides endpoint for cache reads)",
     envVar: "S3_PUBLIC_URL",
+    required: true,
   },
 ];
 
@@ -208,7 +209,7 @@ for (const argvConfigEntry of argvConfig) {
 
 // Transform s3-* properties into nested s3 object
 export const config: Config = {
-  cacheMode: parsedArgs["cache-mode"] as CacheMode,
+  cacheMode: parsedArgs["mode"] as CacheMode,
   registryAppId: parsedArgs["registry-app-id"] as number,
   fromBlock: parsedArgs["from-block"] as number,
   toBlock: parsedArgs["to-block"] as number,
@@ -224,6 +225,6 @@ export const config: Config = {
     region: parsedArgs["s3-region"] as string | undefined,
     bucketName: parsedArgs["s3-bucket-name"] as string | undefined,
     endpoint: parsedArgs["s3-endpoint"] as string | undefined,
-    publicUrl: parsedArgs["s3-public-url"] as string | undefined,
+    publicUrl: parsedArgs["s3-public-url"] as string,
   },
 };

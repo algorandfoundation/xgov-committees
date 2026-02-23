@@ -47,6 +47,7 @@ export class CachePage {
   }
 
   static async loadPage(filename: string) {
+    console.log(`Loading page ${filename}...`);
     try {
       if (await fsExists(filename)) {
         const contents = await readFile(filename);
@@ -61,11 +62,6 @@ export class CachePage {
   }
 
   async savePage() {
-    // Skip saving for read-only pages (from S3)
-    if (this.readOnly) {
-      return;
-    }
-
     // mark dirty up top so we err on the side of caution if we get set() while we are saving
     // if exists on disk, check for changes before saving
     if (this.dirty && this.diskHash !== undefined) {
@@ -90,6 +86,12 @@ export class CachePage {
     await promise;
     this.diskHash = hashBuffer(contents);
     this.pending.delete(promise);
+
+    // TODO: save page to s3 in write-cache mode
+
+    if (config.verbose) {
+      console.debug(`Saved page ${this.filename} (dirty: ${this.dirty})`);
+    }
   }
 
   async evict() {
@@ -110,11 +112,6 @@ export class CachePage {
   }
 
   set(rnd: number, data: string) {
-    // Prevent writes to read-only pages (from S3 in use-cache mode)
-    if (this.readOnly) {
-      throw new Error(`Cannot write to read-only cache page: ${this.filename}`);
-    }
-
     this.lastAccess = Date.now();
     this.dirty = true;
     this.data[String(rnd)] = data;

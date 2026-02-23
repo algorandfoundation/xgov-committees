@@ -3,6 +3,7 @@ import { config } from "../config";
 import {
   getData,
   getKeyWithNetworkMetadata,
+  getMD5HashForObject,
   getPublicUrlForObject,
   objectExists,
   uploadData,
@@ -11,8 +12,55 @@ import { clearLine, downloadToFile, formatDuration } from "../utils";
 import pMap from "p-map";
 import { ensureCacheSubPathExists } from ".";
 import { getCachePath } from "./utils";
+import { CACHE_PAGE_SIZE } from "./cache-page";
+import { createHash } from "crypto";
+import { readFile } from "fs/promises";
+import { cacheManager } from "./cache-manager";
 
 export type CachePagePayload = Record<string, string>;
+
+/**
+ * Validates a single block page by comparing its MD5 hash between S3 and local filesystem.
+ * @param pageStartRnd The starting round number for this page.
+ * @param pageIndex The zero-based index of this page (for logging).
+ * @param totalPages The total number of pages being validated (for logging).
+ * @throws Will throw an error if the MD5 hashes don't match.
+ */
+export async function validateBlockPage(
+  pageStartRnd: number,
+  pageIndex: number,
+  totalPages: number,
+): Promise<void> {
+  // get MD5 hash of page stored on s3
+  const s3MD5Hash = await getMD5HashForObject(
+    getKeyWithNetworkMetadata(`blocks/${pageStartRnd}.json`),
+  );
+
+  if (s3MD5Hash === undefined) {
+    throw new Error(
+      `Cache validation failed! Page starting at round ${pageStartRnd} MD5 not found in S3 ETag`,
+    );
+  }
+
+  // read page file contents as raw bytes
+  const fileBuffer = await readFile(
+    cacheManager.getBlockCacheFilePath(pageStartRnd),
+  );
+
+  // compute MD5 hash of local file contents (bytes) to match S3 behavior
+  const localMD5Hash = createHash("md5").update(fileBuffer).digest("hex");
+
+  // compare hashes and throw if mismatch
+  if (s3MD5Hash !== localMD5Hash) {
+    throw new Error(
+      `Cache validation failed! MD5 hash mismatch for page starting at round ${pageStartRnd}. S3 hash: ${s3MD5Hash}, Local hash: ${localMD5Hash}`,
+    );
+  }
+
+  console.debug(
+    `[${pageIndex + 1}/${totalPages}] Block page validation successful for page starting at round ${pageStartRnd}. S3 MD5 ${s3MD5Hash} matches local MD5 ${localMD5Hash}`,
+  );
+}
 
 /**
  * Downloads block pages from S3 with progress tracking. Expected to be multiples of 1000 blocks since each page covers 1000 blocks.
@@ -30,8 +78,8 @@ export async function downloadBlockPages(
 
   // Generate array of page start blocks
   const targetPages = Array.from(
-    { length: (toBlock - fromBlock) / 1000 },
-    (_, i) => fromBlock + i * 1000,
+    { length: (toBlock - fromBlock) / CACHE_PAGE_SIZE },
+    (_, i) => fromBlock + i * CACHE_PAGE_SIZE,
   );
 
   // Progress tracking state
@@ -76,70 +124,25 @@ export async function downloadBlockPages(
 export async function fetchPageFromS3(
   pageStart: number,
 ): Promise<CachePagePayload | undefined> {
-  // In use-cache mode, fetch from public URL endpoint
-  if (config.cacheMode === "use-cache") {
-    const url = getPublicUrlForObject(`blocks/${pageStart}.json`); // For backward compatibility with old key format
+  const url = getPublicUrlForObject(`blocks/${pageStart}.json`); // For backward compatibility with old key format
 
-    console.log(`Fetching S3 page: ${url}`);
-
-    try {
-      const res = await fetch(url);
-      if (res.status === 404) return undefined;
-      if (!res.ok) throw new Error(`Fetching ${url} failed: ${res.status}`);
-      const data = await res.json();
-
-      if (config.verbose) {
-        console.debug(`S3 cache hit: ${url}`);
-      }
-
-      return data as CachePagePayload;
-    } catch (error) {
-      if (config.verbose) {
-        console.debug(`S3 cache miss: ${url}`);
-      }
-      throw error;
-    }
-  }
-
-  const key = getKeyWithNetworkMetadata(`blocks/${pageStart}.json`); // For backward compatibility with old key format
+  console.log(`Fetching S3 page: ${url}`);
 
   try {
-    const body = await getData(key);
-
-    if (!body) {
-      return undefined;
-    }
-
-    // Convert stream or string body to string
-    const bodyString =
-      typeof body === "string" ? body : await body.transformToString("utf-8");
-    const data = JSON.parse(bodyString) as CachePagePayload;
+    const res = await fetch(url);
+    if (res.status === 404) return undefined;
+    if (!res.ok) throw new Error(`Fetching ${url} failed: ${res.status}`);
+    const data = await res.json();
 
     if (config.verbose) {
-      console.debug(`S3 cache hit: ${key}`);
+      console.debug(`S3 cache hit: ${url}`);
     }
 
-    return data;
+    return data as CachePagePayload;
   } catch (error) {
-    const err = error as {
-      $metadata?: { httpStatusCode?: number };
-      name?: string;
-      Code?: string;
-    };
-
-    // 404 means not found - this is expected, return undefined
-    if (
-      err?.$metadata?.httpStatusCode === 404 ||
-      err?.name === "NoSuchKey" ||
-      err?.Code === "NoSuchKey"
-    ) {
-      if (config.verbose) {
-        console.debug(`S3 cache miss: ${key}`);
-      }
-      return undefined;
+    if (config.verbose) {
+      console.debug(`S3 cache miss: ${url}`);
     }
-
-    // Other errors should be thrown so caller can handle
     throw error;
   }
 }

@@ -5,13 +5,13 @@ import { subtractCached, getCache, setCache } from "./cache";
 import { chunk, clearLine, formatDuration, sleep } from "./utils";
 import { BlockHeader } from "algosdk";
 
-export const getBlocks = async (rnds: number[]) => {
+export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   let total = rnds.length;
   let v = "";
   const startBlock = rnds[0];
   const endBlock = rnds.at(-1);
 
-  const requiredRnds = await subtractCached(rnds);
+  const requiredRnds = skipCache ? rnds : await subtractCached(rnds);
   let processed = rnds.length - requiredRnds.length;
 
   console.log(`Network:\t${networkMetadata.genesisID}`);
@@ -49,7 +49,7 @@ export const getBlocks = async (rnds: number[]) => {
   process.stdout.write(`Block data: \t${total} OK\n`);
 
   async function getBlockWithStatus(rnd: number): Promise<BlockHeader> {
-    const data = await getBlock(rnd);
+    const data = await getBlock(rnd, skipCache);
     processed++;
     const percent = ((100 * processed) / total).toFixed(2);
     const etaSec = (total - processed) / parseFloat(v);
@@ -62,9 +62,12 @@ export const getBlocks = async (rnds: number[]) => {
   }
 };
 
-export const getBlock = async (rnd: number): Promise<BlockHeader> => {
+export const getBlock = async (
+  rnd: number,
+  skipCache: boolean = false,
+): Promise<BlockHeader> => {
   let cached: BlockHeader | undefined;
-  if ((cached = await getCache(rnd))) {
+  if (!skipCache && (cached = await getCache(rnd))) {
     try {
       const { round, genesisHash } = cached;
 
@@ -83,22 +86,8 @@ export const getBlock = async (rnd: number): Promise<BlockHeader> => {
     } catch (e) {
       console.error(`Error in cached file ${rnd}:`, (e as Error).message);
 
-      // In use-cache mode, don't refetch - fail fast
-      if (config.cacheMode === "use-cache") {
-        throw new Error(
-          `Block ${rnd} is corrupted in S3 cache and cannot be refetched in use-cache mode`,
-        );
-      }
-
       console.log("Refetching: ", rnd);
     }
-  }
-
-  // In use-cache mode, block should be in cache - fail if not found
-  if (config.cacheMode === "use-cache") {
-    throw new Error(
-      `Block ${rnd} not found in S3 cache. All blocks must be pre-cached when using use-cache mode.`,
-    );
   }
 
   // For other modes, fetch from algod and cache it

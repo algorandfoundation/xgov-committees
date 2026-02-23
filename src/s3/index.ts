@@ -202,8 +202,6 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
           Key: shortcutKey,
         }),
       );
-    } else {
-      //console.warn(`Skipping unrecognized committee file format: ${key}`);
     }
   }
 }
@@ -217,8 +215,9 @@ export async function syncDirectory(directoryPath: string) {
 
   const files = await walkDir(directoryPath);
   const fileToKey = (filePath: string) =>
-    relative(directoryPath, filePath).replace(/\\/g, "/");
-
+    getKeyWithNetworkMetadata(
+      relative(directoryPath, filePath).replace(/\\/g, "/"),
+    );
   const keys = files.map(fileToKey);
 
   // Optimize existence checks:
@@ -293,7 +292,6 @@ export async function syncDirectory(directoryPath: string) {
           Bucket: bucketName,
           Key: key,
           Body: body,
-          ChecksumAlgorithm: "SHA256",
         }),
       );
 
@@ -321,31 +319,44 @@ export async function syncDirectory(directoryPath: string) {
   );
 }
 
-export async function getHashForKey(key: string): Promise<string | undefined> {
-  const client = getS3Client();
-
-  try {
-    const response = await client.send(
-      new HeadObjectCommand({ Bucket: bucketName, Key: key }),
-    );
-    return response.ChecksumSHA256;
-  } catch (error) {
-    const err = error as {
-      $metadata?: { httpStatusCode?: number };
-      name?: string;
-      Code?: string;
-    };
-    if (
-      err?.$metadata?.httpStatusCode === 404 ||
-      err?.name === "NotFound" ||
-      err?.Code === "NotFound"
-    ) {
-      return undefined;
-    }
-    throw error;
+/**
+ * Get the ETag of an object in S3 by its key. This can be used to verify integrity or check for changes.
+ *
+ * Note: For simple, single-part, unencrypted objects, the ETag is often the MD5 hash of the object data.
+ * For multipart uploads or encrypted objects, however, the ETag may not be a pure MD5 hash and should
+ * be treated as an opaque identifier unless you know otherwise for your specific bucket configuration.
+ *
+ * @param key key for object
+ * @returns {Promise<string | undefined>} Resolves with the object's ETag value (without surrounding quotes),
+ * or undefined if not found. Throws on error.
+ */
+export async function getMD5HashForObject(
+  key: string,
+): Promise<string | undefined> {
+  if (!publicUrl) {
+    throw new Error("S3 public URL is not configured");
   }
+
+  const url = `${publicUrl.replace(/\/$/, "")}/${key}`;
+  const response = await fetch(url, { method: "HEAD" });
+  if (response.status === 404) {
+    return undefined;
+  }
+
+  const etag = response.headers.get("ETag");
+  if (!etag) {
+    throw new Error(`ETag header not found for ${url}`);
+  }
+
+  // ETag is usually in quotes, remove them
+  return etag.replace(/"/g, "");
 }
 
+/**
+ * Get data from S3 for the specified key.
+ * @param key full key path
+ * @returns {Promise<any>} Resolves with the data from S3, or rejects if not found or on error
+ */
 export async function getData(key: string): Promise<any> {
   const client = getS3Client();
 
@@ -386,8 +397,6 @@ export async function uploadData(key: string, data: string): Promise<void> {
       Bucket: bucketName,
       Key: key,
       Body: data,
-      ContentType: "application/json",
-      ChecksumAlgorithm: "SHA256",
     }),
   );
 }

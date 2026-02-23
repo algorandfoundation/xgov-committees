@@ -15,12 +15,12 @@ export class CacheManager {
   pages = new Map<number, CachePage>();
   loading = new Map<number, Promise<CachePage>>();
   shuttingDown = false;
-  from: "s3" | "local";
+  useS3 = false;
 
-  constructor(maxPages = CACHE_MAX_PAGES, from: "s3" | "local" = "local") {
+  constructor(maxPages = CACHE_MAX_PAGES, useS3 = false) {
     this.cachePath = getCachePath("blocks");
     this.maxPages = maxPages;
-    this.from = from;
+    this.useS3 = useS3;
   }
 
   async get(rnd: number) {
@@ -53,9 +53,10 @@ export class CacheManager {
 
   async hasPage(pageStart: number): Promise<boolean> {
     // assume page exists and let fetch fail if not
-    if (this.from === "s3") {
+    if (this.useS3) {
       return true;
     }
+
     // For other modes (write-cache, validate-cache), check filesystem
     return fsExists(this.getBlockCacheFilePath(pageStart));
   }
@@ -84,7 +85,7 @@ export class CacheManager {
           let page: CachePage;
 
           // In use-cache mode, fetch from S3 and create read-only page
-          if (this.from === "s3") {
+          if (this.useS3) {
             const s3Data = await fetchPageFromS3(pageStart);
             if (!s3Data) {
               throw new Error(`Page ${pageStart} not found in S3 cache`);
@@ -157,10 +158,7 @@ export class CacheManager {
   }
 }
 
-export const cacheManager = new CacheManager(
-  CACHE_MAX_PAGES,
-  config.cacheMode === "validate-cache" ? "local" : "s3",
-);
+export const cacheManager = new CacheManager(CACHE_MAX_PAGES);
 
 for (const sig of [
   "SIGTERM",
