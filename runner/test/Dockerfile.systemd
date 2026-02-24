@@ -1,0 +1,12 @@
+# Used by `verify-systemd.sh` (called from `systemd.test.ts`).
+
+# Minimal image with systemd tooling for running systemd-analyze verify.
+# Mocks runtime dependencies (pnpm) and creates the service user so the 
+# verifier can resolve all references in the unit files.
+
+FROM ubuntu:24.04
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends systemd \
+ && rm -rf /var/lib/apt/lists/*
+RUN printf '#!/bin/sh\n' > /usr/local/bin/pnpm && chmod +x /usr/local/bin/pnpm
+RUN useradd --system --no-create-home xgov-committee-runner

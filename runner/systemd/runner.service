@@ -1,0 +1,13 @@
+[Unit]
+Description=xGov Committee Service Runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=pnpm --dir /opt/xgov-committees/runner tsx index.ts
+WatchdogSec=65
+User=xgov-committee-runner
+
+[Install]
+WantedBy=multi-user.target
