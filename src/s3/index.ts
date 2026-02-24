@@ -14,8 +14,9 @@ import { createReadStream } from "fs";
 import { stat as fsStat } from "fs/promises";
 import pMap from "p-map";
 import { formatBytes } from "../cache/utils";
-import { walkDir } from "../utils";
+import { committeeIdToSafeFileName, walkDir } from "../utils";
 import { relative } from "path";
+import { getCommitteeID, loadCommittee } from "../committee";
 
 const {
   s3: { bucketName, region, endpoint, accessKeyId, secretAccessKey, publicUrl },
@@ -163,47 +164,125 @@ export async function listKeysWithPrefix(prefix: string): Promise<Set<string>> {
 }
 
 /**
+ * Generate shortcut keys for committee data based on the period end round and committee ID, to allow fetching committee data from S3 by these identifiers.
+ * @param fromRound from round
+ * @param toRound to round
+ * @returns {Promise<[string, string]>} [shortcutKeyByRound, shortcutKeyByCommitteeID]
+ * @throws if committee data is not found for the specified rounds
+ */
+async function getShortcutKeysForPeriod(
+  fromRound: number,
+  toRound: number,
+): Promise<[string, string]> {
+  const committee = await loadCommittee(fromRound, toRound, "s3");
+
+  if (!committee) {
+    throw new Error(
+      `Committee data not found for rounds ${fromRound}-${toRound}, skipping shortcut creation`,
+    );
+  }
+
+  const committeeID = getCommitteeID(committee);
+  const safeCommitteeID = committeeIdToSafeFileName(committeeID);
+
+  const baseKey = getKeyWithNetworkMetadata(`committee/`);
+
+  return [`${baseKey}${toRound}.json`, `${baseKey}${safeCommitteeID}.json`];
+}
+
+/**
  * We must be able to serve committee data from S3 by the period end round, to facilitate this we just create a copy of the existing files
  */
 export async function ensureCommitteeShortcuts(): Promise<void> {
   const client = getS3Client();
 
-  console.log("Creating committee shortcuts...");
+  if (config.verbose) {
+    console.log("Ensuring committee shortcuts exist in S3...");
+  }
 
   const keys = await listKeysWithPrefix(
     getKeyWithNetworkMetadata("committee/"),
   );
 
-  for (const key of keys) {
-    //console.log(`Found file: ${key}`);
-    const match = key.match(/committee\/(\d+)-(\d+)\.json$/);
-    if (match) {
-      const fromRound = match[1];
-      const toRound = match[2];
-      const shortcutKey = key.replace(
-        /committee\/(\d+)-(\d+)\.json$/,
-        `committee/${toRound}.json`,
-      );
+  const copyTasks: Promise<void>[] = [];
 
-      if (await objectExists(shortcutKey)) {
-        console.log(`Shortcut already exists: ${shortcutKey}`);
+  for (const key of keys) {
+    const match = key.match(/committee\/(\d+)-(\d+)\.json$/);
+
+    if (!match) continue;
+
+    const [fromRound, toRound] = [
+      parseInt(match[1], 10),
+      parseInt(match[2], 10),
+    ];
+
+    try {
+      const [endRoundKey, committeeIDKey] = await getShortcutKeysForPeriod(
+        fromRound,
+        toRound,
+      );
+      const [endRoundExists, committeeIDExists] = await Promise.all([
+        objectExists(endRoundKey),
+        objectExists(committeeIDKey),
+      ]);
+
+      if (endRoundExists && committeeIDExists) {
+        if (config.verbose) {
+          console.log(
+            `Both shortcuts for committee ${fromRound}-${toRound} already exist, skipping...`,
+          );
+        }
         continue;
       }
 
-      console.log(
-        `Creating shortcut from round ${fromRound} to ${toRound}: ${shortcutKey}`,
-      );
+      if (!endRoundExists) {
+        copyTasks.push(
+          client
+            .send(
+              new CopyObjectCommand({
+                Bucket: bucketName,
+                CopySource: `${bucketName}/${key}`,
+                Key: endRoundKey,
+              }),
+            )
+            .then(() => {
+              if (config.verbose) {
+                console.log(
+                  `Created shortcut for committee ${fromRound}-${toRound} at ${endRoundKey}`,
+                );
+              }
+            }),
+        );
+      }
 
-      // Copy the object in S3
-      await client.send(
-        new CopyObjectCommand({
-          Bucket: bucketName,
-          CopySource: `${bucketName}/${key}`,
-          Key: shortcutKey,
-        }),
+      if (!committeeIDExists) {
+        copyTasks.push(
+          client
+            .send(
+              new CopyObjectCommand({
+                Bucket: bucketName,
+                CopySource: `${bucketName}/${key}`,
+                Key: committeeIDKey,
+              }),
+            )
+            .then(() => {
+              if (config.verbose) {
+                console.log(
+                  `Created shortcut for committee ${fromRound}-${toRound} at ${committeeIDKey}`,
+                );
+              }
+            }),
+        );
+      }
+    } catch (err) {
+      console.error(
+        `Error processing committee shortcuts ${fromRound}-${toRound}:`,
+        err,
       );
     }
   }
+
+  await Promise.all(copyTasks);
 }
 
 export async function syncDirectory(directoryPath: string) {
@@ -385,7 +464,10 @@ export async function getData(key: string): Promise<any> {
  * @param data string or buffer data to upload
  * @returns {Promise<void>} Resolves when upload is complete
  */
-export async function uploadData(key: string, data: string): Promise<void> {
+export async function uploadData(
+  key: string,
+  data: string | Uint8Array | Buffer,
+): Promise<void> {
   const client = getS3Client();
 
   if (config.verbose) {

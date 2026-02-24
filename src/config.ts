@@ -3,7 +3,7 @@ import yargs from "yargs";
 import type { PositionalOptionsType } from "yargs";
 import { hideBin } from "yargs/helpers";
 
-type CacheMode = "use-cache" | "validate-cache" | "write-cache";
+export type CacheMode = "use-cache" | "validate-cache" | "write-cache";
 
 export type Config = {
   cacheMode: CacheMode;

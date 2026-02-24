@@ -2,6 +2,8 @@ import { readFile, writeFile } from "fs/promises";
 import { hashBuffer } from "./utils";
 import { fsExists } from "../utils";
 import { config } from "../config";
+import { basename } from "path";
+import { getKeyWithNetworkMetadata, uploadData } from "../s3";
 
 export const CACHE_PAGE_SIZE = 1_000;
 export const CACHE_MAX_PAGES = 10;
@@ -47,7 +49,6 @@ export class CachePage {
   }
 
   static async loadPage(filename: string) {
-    console.log(`Loading page ${filename}...`);
     try {
       if (await fsExists(filename)) {
         const contents = await readFile(filename);
@@ -87,7 +88,13 @@ export class CachePage {
     this.diskHash = hashBuffer(contents);
     this.pending.delete(promise);
 
-    // TODO: save page to s3 in write-cache mode
+    // we have a complete file on disk at this point, so we can safely upload to S3 if needed
+    if (!this.dirty) {
+      await uploadData(
+        getKeyWithNetworkMetadata(`blocks/${basename(this.filename)}`),
+        contents,
+      );
+    }
 
     if (config.verbose) {
       console.debug(`Saved page ${this.filename} (dirty: ${this.dirty})`);

@@ -57,7 +57,6 @@ export class CacheManager {
       return true;
     }
 
-    // For other modes (write-cache, validate-cache), check filesystem
     return fsExists(this.getBlockCacheFilePath(pageStart));
   }
 
@@ -158,7 +157,10 @@ export class CacheManager {
   }
 }
 
-export const cacheManager = new CacheManager(CACHE_MAX_PAGES);
+export const cacheManager = new CacheManager(
+  CACHE_MAX_PAGES,
+  config.cacheMode === "write-cache", // useS3 only in write-cache mode
+);
 
 for (const sig of [
   "SIGTERM",
