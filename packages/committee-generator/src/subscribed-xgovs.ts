@@ -1,17 +1,13 @@
-import { decodeUint64, encodeAddress } from "algosdk";
-import { algod } from "./algod";
-import { config } from "./config";
-import pMap from "p-map";
-import { getCachePath } from "./cache/utils";
-import { ensureCacheSubPathExists } from "./cache";
-import { join } from "path";
-import { readFile, writeFile } from "fs/promises";
-import { clearLine, fsExists } from "./utils";
-import {
-  getKeyWithNetworkMetadata,
-  getPublicUrlForObject,
-  uploadData,
-} from "./s3";
+import { decodeUint64, encodeAddress } from 'algosdk';
+import { algod } from './algod';
+import { config } from './config';
+import pMap from 'p-map';
+import { getCachePath } from './cache/utils';
+import { ensureCacheSubPathExists } from './cache';
+import { join } from 'path';
+import { readFile, writeFile } from 'fs/promises';
+import { clearLine, fsExists } from './utils';
+import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
 
 /*
     Gets subscribed xGovs from registry contract
@@ -27,11 +23,11 @@ import {
 
 export type XGovsRecord = Record<string, number>;
 
-const label = "subscribed xGovs";
-const cacheSubPath = "subscribed-xGovs";
+const label = 'subscribed xGovs';
+const cacheSubPath = 'subscribed-xGovs';
 
 const { toBlock: cutoffBlock, registryAppId, concurrency, verbose } = config;
-const xgovBoxPrefix = "x".charCodeAt(0);
+const xgovBoxPrefix = 'x'.charCodeAt(0);
 
 export async function getSubscribedXgovs({
   force,
@@ -49,9 +45,7 @@ export async function getSubscribedXgovs({
     }
   }
 
-  const { boxes: registryBoxes } = await algod
-    .getApplicationBoxes(registryAppId)
-    .do();
+  const { boxes: registryBoxes } = await algod.getApplicationBoxes(registryAppId).do();
   const xgovBoxes = registryBoxes
     .filter(({ name }) => name[0] === xgovBoxPrefix)
     .map(({ name }) => name);
@@ -65,12 +59,10 @@ export async function getSubscribedXgovs({
     xgovBoxes,
     async (xgovBox: Uint8Array) => {
       const address = encodeAddress(xgovBox.slice(1));
-      const { value } = await algod
-        .getApplicationBoxByName(registryAppId, xgovBox)
-        .do();
+      const { value } = await algod.getApplicationBoxByName(registryAppId, xgovBox).do();
 
       // see top - subscribed is at offset 48, length 8
-      const subscribedRound = decodeUint64(value.slice(48, 56), "safe");
+      const subscribedRound = decodeUint64(value.slice(48, 56), 'safe');
 
       // TODO is subscription at exactly cutoff eligible or not?
       // 3M range is [) end-exclusive so I think not
@@ -107,12 +99,10 @@ export async function getSubscribedXgovs({
 export async function loadSubscribedXgovs(
   fromBlock: number,
   toBlock: number,
-  from: "local" | "s3" = "local",
+  from: 'local' | 's3' = 'local',
 ): Promise<XGovsRecord | undefined> {
-  if (from === "s3") {
-    const url = getPublicUrlForObject(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
-    );
+  if (from === 's3') {
+    const url = getPublicUrlForObject(`${cacheSubPath}/${fromBlock}-${toBlock}.json`);
 
     try {
       const res = await fetch(url);
@@ -147,12 +137,10 @@ export async function saveSubscribedXgovs(
   fromBlock: number,
   toBlock: number,
   subscribed: XGovsRecord,
-  to: "local" | "s3" = "local",
+  to: 'local' | 's3' = 'local',
 ): Promise<void> {
-  if (to === "s3") {
-    const key = getKeyWithNetworkMetadata(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
-    );
+  if (to === 's3') {
+    const key = getKeyWithNetworkMetadata(`${cacheSubPath}/${fromBlock}-${toBlock}.json`);
 
     return await uploadData(key, JSON.stringify(subscribed));
   }

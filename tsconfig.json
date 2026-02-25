@@ -12,7 +12,5 @@
     "sourceMap": true
   },
   "files": [],
-  "references": [
-    { "path": "./packages/committee-generator" }
-  ]
+  "references": [{ "path": "./packages/committee-generator" }]
 }

@@ -63,10 +63,10 @@ To recreate the data from an archival node, you can specify a cache directory ov
 ```
 # ENV=.env.mainnet.1 ./run.sh -d verify-data
 Creating verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/blocks
-Network:        mainnet-v1.0                                                  
+Network:        mainnet-v1.0
 Registry app:   3147789458
 Node:           https://mainnet-api.4160.nodely.dev
-Token:          No 
+Token:          No
 First block:    50000000
 Last block:     53000000
 --
@@ -92,16 +92,16 @@ After all blocks are fetched:
 Sample output (during proposer data aggregation)
 
 ```
-Block proposer:	50230999 743000/3000000 24.77% 
+Block proposer:	50230999 743000/3000000 24.77%
 ```
 
 Sample output, successful exit:
 
 ```
-Proposer data:  3000000 OK                                                    
+Proposer data:  3000000 OK
 Writing proposers to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/proposers/50000000-53000000.jsons
 Writing candidate committee to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/candidate-committee/50000000-53000000.json
-Found XX xGovs. Querying subscription rounds. Cutoff_block=53000000 
+Found XX xGovs. Querying subscription rounds. Cutoff_block=53000000
 Ignoring Y xGov(s) that subscribed after the cutoff round (53000000)
 Found XY xGovs subscribed before cutoff round 53000000
 Writing subscribed xGovs to verify-data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/subscribed-xGovs/50000000-53000000.json

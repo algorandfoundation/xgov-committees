@@ -1,17 +1,13 @@
-import { join } from "path";
-import { ensureCacheSubPathExists as ensureCacheSubPathExists } from "./cache";
-import { getCachePath } from "./cache/utils";
-import { readFile, writeFile } from "fs/promises";
-import { networkMetadata } from "./algod";
-import { CandidateCommittee } from "./candidate-committee";
-import { clearLine, fsExists, sha512_256_raw } from "./utils";
-import { validateCommitteeString } from "./committee-validate";
-import { XGovsRecord } from "./subscribed-xgovs";
-import {
-  getKeyWithNetworkMetadata,
-  getPublicUrlForObject,
-  uploadData,
-} from "./s3";
+import { join } from 'path';
+import { ensureCacheSubPathExists as ensureCacheSubPathExists } from './cache';
+import { getCachePath } from './cache/utils';
+import { readFile, writeFile } from 'fs/promises';
+import { networkMetadata } from './algod';
+import { CandidateCommittee } from './candidate-committee';
+import { clearLine, fsExists, sha512_256_raw } from './utils';
+import { validateCommitteeString } from './committee-validate';
+import { XGovsRecord } from './subscribed-xgovs';
+import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
 
 export type Committee = {
   networkGenesisHash: string;
@@ -29,8 +25,8 @@ export type Committee = {
   }[];
 };
 
-const label = "committee";
-const cacheSubPath = "committee";
+const label = 'committee';
+const cacheSubPath = 'committee';
 
 export function getCommittee(
   fromBlock: number,
@@ -70,12 +66,10 @@ export function getCommittee(
 export async function loadCommittee(
   fromBlock: number,
   toBlock: number,
-  from: "local" | "s3" = "local",
+  from: 'local' | 's3' = 'local',
 ): Promise<Committee | undefined> {
-  if (from === "s3") {
-    const url = getPublicUrlForObject(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
-    );
+  if (from === 's3') {
+    const url = getPublicUrlForObject(`${cacheSubPath}/${fromBlock}-${toBlock}.json`);
 
     try {
       const res = await fetch(url);
@@ -117,12 +111,10 @@ export async function saveCommittee(
   fromBlock: number,
   toBlock: number,
   committee: Committee,
-  to: "local" | "s3" = "local",
+  to: 'local' | 's3' = 'local',
 ): Promise<void> {
-  if (to === "s3") {
-    const key = getKeyWithNetworkMetadata(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
-    );
+  if (to === 's3') {
+    const key = getKeyWithNetworkMetadata(`${cacheSubPath}/${fromBlock}-${toBlock}.json`);
 
     return await uploadData(key, JSON.stringify(committee));
   }
@@ -142,7 +134,7 @@ export function getCommitteeID(committee: Committee): string {
   const committeeJSON = JSON.stringify(committee);
   const committeeJSONHash = sha512_256_raw(committeeJSON);
   const committeeIDHash = sha512_256_raw(
-    Buffer.concat([Buffer.from("arc0086"), committeeJSONHash]),
+    Buffer.concat([Buffer.from('arc0086'), committeeJSONHash]),
   );
-  return committeeIDHash.toString("base64");
+  return committeeIDHash.toString('base64');
 }

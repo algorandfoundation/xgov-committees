@@ -1,26 +1,19 @@
-import { join } from "path";
-import { ensureCacheSubPathExists as ensureCacheSubPathExists } from "./cache";
-import { getCachePath } from "./cache/utils";
-import { readFile, writeFile } from "fs/promises";
-import { ProposerMap } from "./proposers";
-import { clearLine, fsExists } from "./utils";
-import {
-  getKeyWithNetworkMetadata,
-  getPublicUrlForObject,
-  uploadData,
-} from "./s3";
+import { join } from 'path';
+import { ensureCacheSubPathExists as ensureCacheSubPathExists } from './cache';
+import { getCachePath } from './cache/utils';
+import { readFile, writeFile } from 'fs/promises';
+import { ProposerMap } from './proposers';
+import { clearLine, fsExists } from './utils';
+import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
 
 export type CandidateCommittee = Record<string, number>;
 
-const label = "candidate committee";
-const cacheSubPath = "candidate-committee";
+const label = 'candidate committee';
+const cacheSubPath = 'candidate-committee';
 
 export async function getCandidateCommittee(proposerMap: ProposerMap) {
   return Object.fromEntries(
-    [...proposerMap.entries()].map(([proposer, rnds]) => [
-      proposer,
-      rnds.length,
-    ]),
+    [...proposerMap.entries()].map(([proposer, rnds]) => [proposer, rnds.length]),
   );
 }
 
@@ -36,10 +29,7 @@ function validateCandidateCommittee(
   candidateCommittee: Record<string, number>,
   expectedCount: number,
 ): Record<string, number> {
-  const actualCount = Object.values(candidateCommittee).reduce(
-    (sum, value) => sum + value,
-    0,
-  );
+  const actualCount = Object.values(candidateCommittee).reduce((sum, value) => sum + value, 0);
   if (actualCount !== expectedCount) {
     throw new Error(
       `Expected ${expectedCount} rounds, found ${actualCount} in candidate committee`,
@@ -51,23 +41,18 @@ function validateCandidateCommittee(
 export async function loadCandidateCommittee(
   fromBlock: number,
   toBlock: number,
-  from: "local" | "s3" = "local",
+  from: 'local' | 's3' = 'local',
 ): Promise<CandidateCommittee | undefined> {
   const expectedCount = toBlock - fromBlock;
 
-  if (from === "s3") {
-    const url = getPublicUrlForObject(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
-    );
+  if (from === 's3') {
+    const url = getPublicUrlForObject(`${cacheSubPath}/${fromBlock}-${toBlock}.json`);
     try {
       const res = await fetch(url);
       if (res.status === 404) return;
       if (!res.ok) throw new Error(`Fetching ${url} failed: ${res.status}`);
       const data = await res.json();
-      const committee = validateCandidateCommittee(
-        data as Record<string, number>,
-        expectedCount,
-      );
+      const committee = validateCandidateCommittee(data as Record<string, number>, expectedCount);
       console.log(`Using cached S3 candidate committee: ${url}`);
       return committee;
     } catch (e) {
@@ -100,12 +85,10 @@ export async function saveCandidateCommittee(
   fromBlock: number,
   toBlock: number,
   committee: CandidateCommittee,
-  to: "local" | "s3" = "local",
+  to: 'local' | 's3' = 'local',
 ): Promise<void> {
-  if (to === "s3") {
-    const key = getKeyWithNetworkMetadata(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.json`,
-    );
+  if (to === 's3') {
+    const key = getKeyWithNetworkMetadata(`${cacheSubPath}/${fromBlock}-${toBlock}.json`);
 
     return await uploadData(key, JSON.stringify(committee));
   }

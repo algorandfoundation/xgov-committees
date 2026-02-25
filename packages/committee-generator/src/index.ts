@@ -1,19 +1,19 @@
-import { ensureCacheSubPathExists } from "./cache";
+import { ensureCacheSubPathExists } from './cache';
 
-import { CacheMode, config } from "./config";
-import { runUseCache, runValidateCache, runWriteCache } from "./modes";
+import { CacheMode, config } from './config';
+import { runUseCache, runValidateCache, runWriteCache } from './modes';
 
 const { cacheMode, fromBlock, toBlock } = config;
 
 console.log(`Running in cache mode: ${cacheMode}`);
 
 const cacheModes: Record<CacheMode, () => Promise<void>> = {
-  "validate-cache": () => runValidateCache(fromBlock, toBlock),
-  "write-cache": () => runWriteCache(fromBlock, toBlock),
-  "use-cache": () => runUseCache(fromBlock, toBlock),
+  'validate-cache': () => runValidateCache(fromBlock, toBlock),
+  'write-cache': () => runWriteCache(fromBlock, toBlock),
+  'use-cache': () => runUseCache(fromBlock, toBlock),
 };
 
-await ensureCacheSubPathExists("blocks");
+await ensureCacheSubPathExists('blocks');
 
 try {
   await cacheModes[cacheMode]();

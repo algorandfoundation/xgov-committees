@@ -1,33 +1,19 @@
-import pMap from "p-map";
-import { getBlocks } from "../blocks";
-import { getCachedRounds } from "../cache";
-import { cacheManager } from "../cache/cache-manager";
-import { CACHE_PAGE_SIZE } from "../cache/cache-page";
-import { validateBlockPage } from "../cache/s3-cache";
+import pMap from 'p-map';
+import { getBlocks } from '../blocks';
+import { getCachedRounds } from '../cache';
+import { cacheManager } from '../cache/cache-manager';
+import { CACHE_PAGE_SIZE } from '../cache/cache-page';
+import { validateBlockPage } from '../cache/s3-cache';
 import {
   getCandidateCommittee,
   saveCandidateCommittee,
   loadCandidateCommittee,
-} from "../candidate-committee";
-import {
-  getCommittee,
-  saveCommittee,
-  loadCommittee,
-  getCommitteeID,
-} from "../committee";
-import {
-  getBlockProposers,
-  saveProposers,
-  loadProposers,
-  serializeProposers,
-} from "../proposers";
-import {
-  getSubscribedXgovs,
-  saveSubscribedXgovs,
-  loadSubscribedXgovs,
-} from "../subscribed-xgovs";
-import { makeRndsArray } from "../utils";
-import { config } from "../config";
+} from '../candidate-committee';
+import { getCommittee, saveCommittee, loadCommittee, getCommitteeID } from '../committee';
+import { getBlockProposers, saveProposers, loadProposers, serializeProposers } from '../proposers';
+import { getSubscribedXgovs, saveSubscribedXgovs, loadSubscribedXgovs } from '../subscribed-xgovs';
+import { makeRndsArray } from '../utils';
+import { config } from '../config';
 
 const { registryAppId } = config;
 
@@ -38,10 +24,7 @@ const { registryAppId } = config;
  * @throws Will throw an error if any block is missing from the cache or if any data mismatch is found between S3 and local generation.
  * @returns {Promise<void>}
  */
-export async function runValidateCache(
-  fromBlock: number,
-  toBlock: number,
-): Promise<void> {
+export async function runValidateCache(fromBlock: number, toBlock: number): Promise<void> {
   const rnds = makeRndsArray(fromBlock, toBlock);
 
   // must be multiples of CACHE_PAGE_SIZE for proper page alignment
@@ -72,11 +55,7 @@ export async function runValidateCache(
   await pMap(
     Array.from({ length: numberOfPages }, (_, i) => i),
     (pageIndex) =>
-      validateBlockPage(
-        pageStart + pageIndex * CACHE_PAGE_SIZE,
-        pageIndex,
-        numberOfPages,
-      ),
+      validateBlockPage(pageStart + pageIndex * CACHE_PAGE_SIZE, pageIndex, numberOfPages),
     { concurrency: config.concurrency },
   );
 
@@ -86,15 +65,13 @@ export async function runValidateCache(
 
   // recreate proposers locally
   const proposers = await getBlockProposers(rnds);
-  await saveProposers(fromBlock, toBlock, proposers, "local");
+  await saveProposers(fromBlock, toBlock, proposers, 'local');
 
   // read and compare proposers from S3 and local cache
-  const s3Proposers = await loadProposers(fromBlock, toBlock, "s3");
+  const s3Proposers = await loadProposers(fromBlock, toBlock, 's3');
 
   if (!s3Proposers) {
-    throw new Error(
-      `Proposers not found in S3 cache for blocks ${fromBlock}-${toBlock}.`,
-    );
+    throw new Error(`Proposers not found in S3 cache for blocks ${fromBlock}-${toBlock}.`);
   }
 
   // compare s3 and local proposers (sort keys for consistent comparison)
@@ -110,15 +87,13 @@ export async function runValidateCache(
 
   // recreate subscribed xGovs locally
   const subscribedxGovs = await getSubscribedXgovs();
-  await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs, "local");
+  await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs, 'local');
 
   // read and compare subscribed xGovs from S3 and local cache
-  const s3SubscribedXgovs = await loadSubscribedXgovs(fromBlock, toBlock, "s3");
+  const s3SubscribedXgovs = await loadSubscribedXgovs(fromBlock, toBlock, 's3');
 
   if (!s3SubscribedXgovs) {
-    throw new Error(
-      `Subscribed xGovs not found in S3 cache for blocks ${fromBlock}-${toBlock}.`,
-    );
+    throw new Error(`Subscribed xGovs not found in S3 cache for blocks ${fromBlock}-${toBlock}.`);
   }
 
   // compare s3 and local subscribed xGovs (sort keys for consistent comparison)
@@ -137,14 +112,10 @@ export async function runValidateCache(
 
   // recreate candidate committee locally
   const candidateCommittee = await getCandidateCommittee(proposers);
-  await saveCandidateCommittee(fromBlock, toBlock, candidateCommittee, "local");
+  await saveCandidateCommittee(fromBlock, toBlock, candidateCommittee, 'local');
 
   // read and compare candidate committee from S3 and local cache
-  const s3CandidateCommittee = await loadCandidateCommittee(
-    fromBlock,
-    toBlock,
-    "s3",
-  );
+  const s3CandidateCommittee = await loadCandidateCommittee(fromBlock, toBlock, 's3');
 
   if (!s3CandidateCommittee) {
     throw new Error(
@@ -154,10 +125,7 @@ export async function runValidateCache(
 
   // compare s3 and local candidate committees (sort keys for consistent comparison)
   if (
-    JSON.stringify(
-      s3CandidateCommittee,
-      Object.keys(s3CandidateCommittee).sort(),
-    ) !==
+    JSON.stringify(s3CandidateCommittee, Object.keys(s3CandidateCommittee).sort()) !==
     JSON.stringify(candidateCommittee, Object.keys(candidateCommittee).sort())
   ) {
     throw new Error(
@@ -177,15 +145,13 @@ export async function runValidateCache(
     candidateCommittee,
     subscribedxGovs,
   );
-  await saveCommittee(fromBlock, toBlock, committee, "local");
+  await saveCommittee(fromBlock, toBlock, committee, 'local');
 
   // read and compare final committee from S3 and local cache
-  const s3Committee = await loadCommittee(fromBlock, toBlock, "s3");
+  const s3Committee = await loadCommittee(fromBlock, toBlock, 's3');
 
   if (!s3Committee) {
-    throw new Error(
-      `Committee not found in S3 cache for blocks ${fromBlock}-${toBlock}.`,
-    );
+    throw new Error(`Committee not found in S3 cache for blocks ${fromBlock}-${toBlock}.`);
   }
 
   // get committee IDs and compare
