@@ -1,0 +1,77 @@
+{
+  "folders": [
+    {
+      "name": "ROOT",
+      "path": "."
+    },
+    {
+      "name": "committee-generator",
+      "path": "packages/committee-generator"
+    }
+  ],
+  "settings": {
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/data": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-typescript-next"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build All",
+        "type": "npm",
+        "script": "build",
+        "path": ".",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": ["$tsc"]
+      },
+      {
+        "label": "Test All",
+        "type": "npm",
+        "script": "test",
+        "path": ".",
+        "group": {
+          "kind": "test",
+          "isDefault": true
+        }
+      },
+      {
+        "label": "Build committee-generator",
+        "type": "npm",
+        "script": "build",
+        "path": "packages/committee-generator",
+        "group": "build",
+        "problemMatcher": ["$tsc"]
+      },
+      {
+        "label": "Test committee-generator",
+        "type": "npm",
+        "script": "test",
+        "path": "packages/committee-generator",
+        "group": "test"
+      }
+    ]
+  }
+}

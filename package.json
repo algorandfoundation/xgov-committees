@@ -1,29 +1,20 @@
 {
-  "name": "xgov-committee-generator",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "build": "tsc",
-    "test": "vitest run"
-  },
-  "author": "",
+  "name": "xgov-committees",
   "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.978.0",
-    "algosdk": "^3.3.1",
-    "dotenv": "^17.2.1",
-    "js-sha512": "^0.9.0",
-    "json-schema": "^0.4.0",
-    "p-map": "^7.0.3",
-    "yargs": "^18.0.0"
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "clean": "rm -rf packages/*/dist"
   },
   "devDependencies": {
-    "@types/ajv": "^0.0.5",
-    "@types/json-schema": "^7.0.15",
-    "@types/node": "^24.1.0",
-    "@types/yargs": "^17.0.33",
-    "ajv-formats": "^3.0.1",
     "tsx": "^4.20.3",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
