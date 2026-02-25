@@ -3,7 +3,7 @@ Description=xGov Committee Service Runner Timer
 
 [Timer]
 OnUnitInactiveSec=50min
-OnBootSec=1s
+OnBootSec=0
 
 [Install]
 WantedBy=timers.target

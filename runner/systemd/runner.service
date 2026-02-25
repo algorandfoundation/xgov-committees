@@ -5,9 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=notify
-ExecStart=pnpm --dir /opt/xgov-committees/runner tsx index.ts
+NotifyAccess=all
+WorkingDirectory=/opt/xgov-committees/runner
+ExecStart=/usr/bin/node /opt/xgov-committees/runner/dist/index.js
 WatchdogSec=65
 User=xgov-committee-runner
-
-[Install]
-WantedBy=multi-user.target
