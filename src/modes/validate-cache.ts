@@ -52,7 +52,7 @@ export async function runValidateCache(
   }
 
   // pass true for `skipCache` to getBlocks to skip block header cache and force refetch from algod.
-  await getBlocks(rnds, false);
+  await getBlocks(rnds, true);
   await cacheManager.flushAllPages();
 
   const existing = await getCachedRounds(fromBlock, toBlock);
@@ -97,7 +97,6 @@ export async function runValidateCache(
     );
   }
 
-  // TODO: fix, this always fails
   // compare s3 and local proposers (sort keys for consistent comparison)
   if (serializeProposers(s3Proposers) !== serializeProposers(proposers)) {
     throw new Error(

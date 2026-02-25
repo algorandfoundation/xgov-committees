@@ -56,6 +56,54 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
   return proposers;
 }
 
+/**
+ * Parse and validate proposer map from file contents.
+ * @param fileContents Contents of file on disk/S3 cache
+ * @param fromBlock Start range of blocks for proposers data
+ * @param toBlock End range of blocks for proposers data
+ * @throws Will throw an error if the file contents are not valid JSON, if there are duplicate proposers, if there are duplicate rounds across proposers, or if there are missing rounds in the proposers data for the given block range.
+ * @returns A ProposerMap parsed from the file contents if valid, otherwise an error is thrown indicating the specific validation failure.
+ */
+function parseAndValidateProposerMap(
+  fileContents: string,
+  fromBlock: number,
+  toBlock: number,
+): ProposerMap {
+  const map: ProposerMap = new Map();
+  const lines = fileContents.split("\n").filter(Boolean);
+  let lineNum = 0;
+  for (const line of lines) {
+    const propRnds = JSON.parse(line);
+    const proposer = Object.keys(propRnds)[0];
+    if (!proposer) {
+      throw new Error(`No proposer found in line ${lineNum}`);
+    }
+    if (map.has(proposer)) {
+      throw new Error(
+        `Duplicate proposer ${proposer} found in line ${lineNum}`,
+      );
+    }
+    map.set(proposer, propRnds[proposer]);
+    lineNum++;
+  }
+  const expectedRounds = new Set(makeRndsArray(fromBlock, toBlock));
+  for (const [proposer, rnds] of map.entries()) {
+    for (const rnd of rnds) {
+      if (!expectedRounds.has(rnd)) {
+        throw new Error(
+          `Unexpected or duplicate round ${rnd} found for proposer ${proposer}`,
+        );
+      }
+      expectedRounds.delete(rnd);
+    }
+  }
+  if (expectedRounds.size) {
+    const rndsStr = [...expectedRounds.values()].join(" ");
+    throw new Error(`Proposers cache incomplete, missing rounds: ${rndsStr}`);
+  }
+  return map;
+}
+
 /*
  * Load proposer -> proposed_rounds Map from cache.
  * Validates 1) valid JSON, 2) no duplicate proposers, 3) no duplicate rounds, 4) no missing rounds
@@ -69,50 +117,12 @@ export async function loadProposers(
     const url = getPublicUrlForObject(
       `${cacheSubPath}/${fromBlock}-${toBlock}.jsons`,
     );
-
     try {
       const res = await fetch(url);
       if (res.status === 404) return;
       if (!res.ok) throw new Error(`Fetching ${url} failed: ${res.status}`);
       const fileContents = await res.text();
-
-      const map: ProposerMap = new Map();
-      const lines = fileContents.split("\n").filter(Boolean);
-      let lineNum = 0;
-      for (const line of lines) {
-        const propRnds = JSON.parse(line);
-        const proposer = Object.keys(propRnds)[0];
-        if (!proposer) {
-          throw new Error(`No proposer found in line ${lineNum} in ${url}`);
-        }
-        if (map.has(proposer)) {
-          throw new Error(
-            `Duplicate proposer ${proposer} found in line ${lineNum} in ${url}`,
-          );
-        }
-        map.set(proposer, propRnds[proposer]);
-        lineNum++;
-      }
-
-      const expectedRounds = new Set(makeRndsArray(fromBlock, toBlock));
-      for (const [proposer, rnds] of map.entries()) {
-        for (const rnd of rnds) {
-          if (!expectedRounds.has(rnd)) {
-            throw new Error(
-              `Unexpected or duplicate round ${rnd} found for proposer ${proposer} in ${url}`,
-            );
-          }
-          expectedRounds.delete(rnd);
-        }
-      }
-
-      if (expectedRounds.size) {
-        const rndsStr = [...expectedRounds.values()].join(" ");
-        throw new Error(
-          `Proposers cache incomplete, missing rounds: ${rndsStr}`,
-        );
-      }
-
+      const map = parseAndValidateProposerMap(fileContents, fromBlock, toBlock);
       console.log(`Using S3 proposers: ${url}`);
       return map;
     } catch (e) {
@@ -125,58 +135,14 @@ export async function loadProposers(
 
   if (await fsExists(filePath)) {
     process.stderr.write(`Trying to load ${label} cache`);
-
     try {
       const fileContents = (await readFile(filePath)).toString();
-
-      const map: ProposerMap = new Map();
-      const lines = fileContents.split("\n").filter(Boolean); // split + trim empty lines
-      // parse JSONstream file
-      let lineNum = 0;
-      for (const line of lines) {
-        const propRnds = JSON.parse(line);
-        const proposer = Object.keys(propRnds)[0];
-        if (!proposer) {
-          throw new Error(
-            `No proposer found in line ${lineNum} in ${filePath}`,
-          );
-        }
-        if (map.has(proposer)) {
-          throw new Error(
-            `Duplicate proposer ${proposer} found in line ${lineNum} in ${filePath}`,
-          );
-        }
-        map.set(proposer, propRnds[proposer]);
-        lineNum++;
-      }
-
-      // validate. we want correct number of blocks, no duplicates
-      const expectedRounds = new Set(makeRndsArray(fromBlock, toBlock));
-
-      // delete rounds as we process proposers
-      for (const [proposer, rnds] of map.entries()) {
-        for (const rnd of rnds) {
-          if (!expectedRounds.has(rnd)) {
-            throw new Error(
-              `Unexpected or duplicate round ${rnd} found for proposer ${proposer} in ${filePath}`,
-            );
-          }
-          expectedRounds.delete(rnd);
-        }
-      }
-
-      // we should have zero left in expectedRounds, otherwise we are missing rounds
-      if (expectedRounds.size) {
-        const rndsStr = [...expectedRounds.values()].join(" ");
-        throw new Error(
-          `Proposers cache incomplete, missing rounds: ${rndsStr}`,
-        );
-      }
+      const map = parseAndValidateProposerMap(fileContents, fromBlock, toBlock);
       clearLine();
       console.log(`\rUsing cached ${label} file: ${filePath}`);
       return map;
     } catch (e) {
-      console.warn(`\nIgnoring cached ${label} file: ${e}`);
+      console.warn(`\nIgnoring cached ${label} file: ${(e as Error).message}`);
     }
   }
 }
@@ -214,10 +180,11 @@ export function serializeProposers(proposers: ProposerMap) {
     ([a], [b]) => {
       const aStr = String(a);
       const bStr = String(b);
-      return aStr.localeCompare(bStr);
+      return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
     },
   )) {
-    s += JSON.stringify({ [proposer]: rounds }) + "\n";
+    // sort rounds for deterministic output
+    s += JSON.stringify({ [proposer]: rounds.sort((a, b) => a - b) }) + "\n";
   }
   return s;
 }
