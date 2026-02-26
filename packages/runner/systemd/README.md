@@ -32,13 +32,13 @@ WatchdogSec=65
 If no `WATCHDOG=1` ping is received within 65 seconds, systemd kills the process. The Node code pings every `WATCHDOG_INTERVAL_MS` seconds, allowing a predefined number of missed pings before exiting.
 
 ```ini
-WorkingDirectory=/opt/xgov-committees/runner
+WorkingDirectory=/opt/xgov-committees/packages/runner
 ```
 
 Sets the cwd for the process. Needed for `dotenv` to resolve `.env` files and relative path references.
 
 ```ini
-ExecStart=/usr/bin/node /opt/xgov-committees/runner/dist/index.js
+ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
 ```
 
 Absolute paths for both the Node binary and compiled entry point (no dependency on PATH). The TypeScript source MUST be compiled to JavaScript during the build step in CI/CD before deployment.

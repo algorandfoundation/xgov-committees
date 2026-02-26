@@ -11,7 +11,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 
 RUN useradd --system --no-create-home xgov-committee-runner
 
-WORKDIR /opt/xgov-committees/runner
+WORKDIR /opt/xgov-committees/packages/runner
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
