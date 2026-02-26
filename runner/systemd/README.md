@@ -17,7 +17,7 @@ The service makes HTTP requests to algod. Both configs are needed: `Wants=` ensu
 Type=notify
 ```
 
-To accomplish a oneshot service (only one intance at a time) + systemd watchgod functionality this is the correct type. A `Type=oneshot` service cannot use `WatchdogSec`. `Type=notify` allows the process to make pings to systemd while running. Then, the process MUST exit after completing work. The timer handles re-triggering.
+To accomplish a oneshot service (only one instance at a time) with systemd watchdog functionality, this is the correct type. A `Type=oneshot` service cannot use `WatchdogSec`. `Type=notify` allows the process to make pings to systemd while running. Then, the process MUST exit after completing work. The timer handles re-triggering.
 
 ```ini
 NotifyAccess=all
@@ -29,7 +29,7 @@ The Node process uses `spawnSync("systemd-notify", ...)` (design decision) which
 WatchdogSec=65
 ```
 
-systemd kills the process if no `WATCHDOG=1` ping is received within 65 seconds. The Node code pings every `WATCHDOG_INTERVAL_MS` seconds, allowing a predefined number of missed pings before exiting.
+If no `WATCHDOG=1` ping is received within 65 seconds, systemd kills the process. The Node code pings every `WATCHDOG_INTERVAL_MS` seconds, allowing a predefined number of missed pings before exiting.
 
 ```ini
 WorkingDirectory=/opt/xgov-committees/runner
@@ -41,7 +41,7 @@ Sets the cwd for the process. Needed for `dotenv` to resolve `.env` files and re
 ExecStart=/usr/bin/node /opt/xgov-committees/runner/dist/index.js
 ```
 
-Absolute paths for both the node binary and compiled entry point — no dependency on PATH. The TypeScript source MUST be compiled to JavaScript during the build step in CI/CD before deployment.
+Absolute paths for both the Node binary and compiled entry point (no dependency on PATH). The TypeScript source MUST be compiled to JavaScript during the build step in CI/CD before deployment.
 
 ```ini
 User=xgov-committee-runner
@@ -51,7 +51,7 @@ Runs as a dedicated unprivileged user, restricting access if the process is comp
 
 ### Install
 
-Empty section, omitted. The service is triggered exclusively by the timer. `[Install]` is only needed for services enabled directly via `systemctl enable`. Since only the timer is enabled, an `[Install]` section on the service would be dead configuration.
+Empty section, omitted. The service is triggered exclusively by the timer. `[Install]` is only needed for services enabled directly via `systemctl enable`.
 
 ## runner.timer
 
@@ -75,4 +75,4 @@ Triggers immediately on boot, ensuring the first run doesn't wait the interval a
 WantedBy=timers.target
 ```
 
-Standard target for timer units. For this runner, the timer MUST be the `systemctl enable`d unit. The timer triggers on boot and automatically starts the service at regular intervals.
+Standard target for timer units. For this runner, the timer unit MUST be enabled via `systemctl enable`. The timer triggers on boot and automatically starts the service at regular intervals.
