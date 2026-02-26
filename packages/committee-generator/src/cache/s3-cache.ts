@@ -1,5 +1,5 @@
-import { join } from "path";
-import { config } from "../config";
+import { join } from 'path';
+import { config } from '../config';
 import {
   getData,
   getKeyWithNetworkMetadata,
@@ -7,15 +7,15 @@ import {
   getPublicUrlForObject,
   objectExists,
   uploadData,
-} from "../s3";
-import { clearLine, downloadToFile, formatDuration } from "../utils";
-import pMap from "p-map";
-import { ensureCacheSubPathExists } from ".";
-import { getCachePath } from "./utils";
-import { CACHE_PAGE_SIZE } from "./cache-page";
-import { createHash } from "crypto";
-import { readFile } from "fs/promises";
-import { cacheManager } from "./cache-manager";
+} from '../s3';
+import { clearLine, downloadToFile, formatDuration } from '../utils';
+import pMap from 'p-map';
+import { ensureCacheSubPathExists } from '.';
+import { getCachePath } from './utils';
+import { CACHE_PAGE_SIZE } from './cache-page';
+import { createHash } from 'crypto';
+import { readFile } from 'fs/promises';
+import { cacheManager } from './cache-manager';
 
 export type CachePagePayload = Record<string, string>;
 
@@ -43,12 +43,10 @@ export async function validateBlockPage(
   }
 
   // read page file contents as raw bytes
-  const fileBuffer = await readFile(
-    cacheManager.getBlockCacheFilePath(pageStartRnd),
-  );
+  const fileBuffer = await readFile(cacheManager.getBlockCacheFilePath(pageStartRnd));
 
   // compute MD5 hash of local file contents (bytes) to match S3 behavior
-  const localMD5Hash = createHash("md5").update(fileBuffer).digest("hex");
+  const localMD5Hash = createHash('md5').update(fileBuffer).digest('hex');
 
   // compare hashes and throw if mismatch
   if (s3MD5Hash !== localMD5Hash) {
@@ -69,12 +67,9 @@ export async function validateBlockPage(
  * @throws Will throw an error if the block range is not valid or on failure.
  * @return {Promise<void>} Resolves when all pages are downloaded.
  */
-export async function downloadBlockPages(
-  fromBlock: number,
-  toBlock: number,
-): Promise<void> {
-  const blockCachePath = getCachePath("blocks");
-  await ensureCacheSubPathExists("blocks");
+export async function downloadBlockPages(fromBlock: number, toBlock: number): Promise<void> {
+  const blockCachePath = getCachePath('blocks');
+  await ensureCacheSubPathExists('blocks');
 
   // Generate array of page start blocks
   const targetPages = Array.from(
@@ -103,7 +98,7 @@ export async function downloadBlockPages(
       const rate =
         elapsed > 0
           ? ` ${(downloaded / elapsed).toFixed(2)} pages/sec ETA ${formatDuration((total - downloaded) / (downloaded / elapsed))}`
-          : "";
+          : '';
 
       process.stdout.write(
         `\rDownloading pages:\t${downloaded}/${total} ${percent}%${rate}        `,
@@ -121,9 +116,7 @@ export async function downloadBlockPages(
  * Returns the parsed page data if found, undefined if not found.
  * Throws on errors (caller should handle gracefully).
  */
-export async function fetchPageFromS3(
-  pageStart: number,
-): Promise<CachePagePayload | undefined> {
+export async function fetchPageFromS3(pageStart: number): Promise<CachePagePayload | undefined> {
   const url = getPublicUrlForObject(`blocks/${pageStart}.json`); // For backward compatibility with old key format
 
   console.log(`Fetching S3 page: ${url}`);
@@ -151,10 +144,7 @@ export async function fetchPageFromS3(
  * Uploads a cache page to S3.
  * Throws on error (caller should handle gracefully).
  */
-export async function uploadPageToS3(
-  pageStart: number,
-  data: CachePagePayload,
-): Promise<void> {
+export async function uploadPageToS3(pageStart: number, data: CachePagePayload): Promise<void> {
   const key = getKeyWithNetworkMetadata(`blocks/${pageStart}.json`); // For backward compatibility with old key format
 
   await uploadData(key, JSON.stringify(data));

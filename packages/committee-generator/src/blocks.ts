@@ -1,13 +1,13 @@
-import pMap from "p-map";
-import { config } from "./config";
-import { algod, networkMetadata } from "./algod";
-import { subtractCached, getCache, setCache } from "./cache";
-import { chunk, clearLine, formatDuration, sleep } from "./utils";
-import { BlockHeader } from "algosdk";
+import pMap from 'p-map';
+import { config } from './config';
+import { algod, networkMetadata } from './algod';
+import { subtractCached, getCache, setCache } from './cache';
+import { chunk, clearLine, formatDuration, sleep } from './utils';
+import { BlockHeader } from 'algosdk';
 
 export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   let total = rnds.length;
-  let v = "";
+  let v = '';
   const startBlock = rnds[0];
   const endBlock = rnds.at(-1);
 
@@ -17,14 +17,14 @@ export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   console.log(`Network:\t${networkMetadata.genesisID}`);
   console.log(`Registry app:\t${config.registryAppId}`);
   console.log(`Node:   \t${config.algodServer}`);
-  console.log(`Token:  \t${config.algodToken ? "Yes" : "No"}`);
+  console.log(`Token:  \t${config.algodToken ? 'Yes' : 'No'}`);
   console.log(`First block:\t${startBlock}`);
   console.log(`Last block:\t${endBlock}`);
-  console.log("--");
+  console.log('--');
   console.log(`Total blocks:\t${total}`);
   console.log(`Existing:\t${processed}`);
   console.log(`Remaining:\t${total - processed}`);
-  console.log("--");
+  console.log('--');
 
   const chunks = chunk(requiredRnds, 1_000);
   for (const chunk of chunks) {
@@ -55,17 +55,14 @@ export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
     const etaSec = (total - processed) / parseFloat(v);
     process.stdout.write(
       `\rFetching block:\t${rnd} ${processed}/${total} ${percent}%${
-        v ? ` ${v} rnd/sec ETA ${formatDuration(etaSec)}        ` : ""
+        v ? ` ${v} rnd/sec ETA ${formatDuration(etaSec)}        ` : ''
       }`,
     );
     return data;
   }
 };
 
-export const getBlock = async (
-  rnd: number,
-  skipCache: boolean = false,
-): Promise<BlockHeader> => {
+export const getBlock = async (rnd: number, skipCache: boolean = false): Promise<BlockHeader> => {
   let cached: BlockHeader | undefined;
   if (!skipCache && (cached = await getCache(rnd))) {
     try {
@@ -75,7 +72,7 @@ export const getBlock = async (
         throw new Error(`Unexpected round, found ${round}, expected ${rnd}`);
       }
 
-      const actualGenesisHash = Buffer.from(genesisHash).toString("base64");
+      const actualGenesisHash = Buffer.from(genesisHash).toString('base64');
       if (actualGenesisHash !== networkMetadata.genesisHash) {
         throw new Error(
           `Unexpected genesis hash, found ${actualGenesisHash}, expected ${networkMetadata.genesisHash}`,
@@ -86,7 +83,7 @@ export const getBlock = async (
     } catch (e) {
       console.error(`Error in cached file ${rnd}:`, (e as Error).message);
 
-      console.log("Refetching: ", rnd);
+      console.log('Refetching: ', rnd);
     }
   }
 

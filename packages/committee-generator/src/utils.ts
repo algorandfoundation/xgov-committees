@@ -1,10 +1,10 @@
-import { access, readdir } from "fs/promises";
-import { constants } from "fs";
-import { sha512_256 } from "js-sha512";
-import { join } from "path";
-import { createWriteStream } from "fs";
-import { pipeline } from "stream/promises";
-import { Readable } from "stream";
+import { access, readdir } from 'fs/promises';
+import { constants } from 'fs';
+import { sha512_256 } from 'js-sha512';
+import { join } from 'path';
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
 
 export async function fsExists(path: string) {
   try {
@@ -39,7 +39,7 @@ export function formatDuration(seconds: number): string {
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
 
-  return parts.join(" ");
+  return parts.join(' ');
 }
 
 export function makeRndsArray(fromBlock: number, toBlock: number) {
@@ -48,9 +48,9 @@ export function makeRndsArray(fromBlock: number, toBlock: number) {
 
 export function clearLine() {
   process.stderr.write(
-    "\r                                                                              ",
+    '\r                                                                              ',
   );
-  process.stderr.write("\r");
+  process.stderr.write('\r');
 }
 
 export function isEqual(a: any[], b: any[]) {
@@ -58,16 +58,12 @@ export function isEqual(a: any[], b: any[]) {
 }
 
 export function sha512_256_raw(input: string | Buffer) {
-  return Buffer.from(sha512_256(input), "hex");
+  return Buffer.from(sha512_256(input), 'hex');
 }
 
 export function committeeIdToSafeFileName(committeeId: Buffer): string {
   // Use base64url encoding (base64 without padding, using URL-safe characters)
-  return committeeId
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return committeeId.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 export async function walkDir(dir: string): Promise<string[]> {
@@ -84,20 +80,15 @@ export async function walkDir(dir: string): Promise<string[]> {
   return out;
 }
 
-export async function downloadToFile(
-  url: string,
-  filename: string,
-): Promise<void> {
+export async function downloadToFile(url: string, filename: string): Promise<void> {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to download ${url}: ${response.status} ${response.statusText}`,
-    );
+    throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
   }
 
   if (!response.body) {
-    throw new Error("Response body is empty");
+    throw new Error('Response body is empty');
   }
 
   const fileStream = createWriteStream(filename);

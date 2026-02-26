@@ -1,9 +1,9 @@
-import { readFile, writeFile } from "fs/promises";
-import { hashBuffer } from "./utils";
-import { fsExists } from "../utils";
-import { config } from "../config";
-import { basename } from "path";
-import { getKeyWithNetworkMetadata, uploadData } from "../s3";
+import { readFile, writeFile } from 'fs/promises';
+import { hashBuffer } from './utils';
+import { fsExists } from '../utils';
+import { config } from '../config';
+import { basename } from 'path';
+import { getKeyWithNetworkMetadata, uploadData } from '../s3';
 
 export const CACHE_PAGE_SIZE = 1_000;
 export const CACHE_MAX_PAGES = 10;
@@ -77,8 +77,7 @@ export class CachePage {
         }
       } catch (e) {
         // ok, we tried
-        if (config.verbose)
-          console.warn(`\nError merging dirty page ${this.filename}: `, e);
+        if (config.verbose) console.warn(`\nError merging dirty page ${this.filename}: `, e);
       }
     }
     const contents = Buffer.from(JSON.stringify(this.data));
@@ -90,10 +89,7 @@ export class CachePage {
 
     // we have a complete file on disk at this point, so we can safely upload to S3 if needed
     if (!this.dirty) {
-      await uploadData(
-        getKeyWithNetworkMetadata(`blocks/${basename(this.filename)}`),
-        contents,
-      );
+      await uploadData(getKeyWithNetworkMetadata(`blocks/${basename(this.filename)}`), contents);
     }
 
     if (config.verbose) {
