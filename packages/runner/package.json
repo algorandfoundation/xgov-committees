@@ -17,17 +17,12 @@
     "test:integration": "vitest run test/integration"
   },
   "dependencies": {
-    "dotenv": "^17.3.1",
-    "prettier": "^3.8.1"
+    "dotenv": "^17.3.1"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@types/node": "^24.10.13",
-    "eslint": "^10.0.2",
-    "eslint-config-prettier": "^10.1.8",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   }
 }
