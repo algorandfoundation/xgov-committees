@@ -12,7 +12,9 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "pnpm test:unit && pnpm test:integration",
+    "test:unit": "bash test/unit/run-unit.sh",
+    "test:integration": "vitest run test/integration"
   },
   "dependencies": {
     "dotenv": "^17.3.1",
