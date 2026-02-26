@@ -452,7 +452,7 @@ export async function uploadData(
     const existingMD5 = await getMD5HashForObject(key);
     const newMD5 = getMD5Hash(data);
 
-    if (existingMD5 === newMD5) {
+    if (existingMD5 && existingMD5 === newMD5) {
       if (config.verbose) {
         console.log(`Skipping upload for s3://${bucketName}/${key}, data is unchanged.`);
       }
