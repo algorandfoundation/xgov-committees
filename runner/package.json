@@ -4,7 +4,7 @@
   "description": "Service runner for xGov automated committee generation",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start:prod": "node dist/index.js",
     "start": "tsx index.ts",
     "typecheck": "tsc --noEmit",
