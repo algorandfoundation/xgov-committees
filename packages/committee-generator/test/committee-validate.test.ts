@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { validateCommitteeString } from '../src/committee-validate';
-import { userInfo } from 'os';
-import { register } from 'module';
 import { Committee } from '../src/committee';
 
 function getCommitteeFixture(): Committee {
