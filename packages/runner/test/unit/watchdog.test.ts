@@ -21,7 +21,7 @@ describe("watchdog", () => {
   });
 
   describe("notifySystemd", () => {
-    it("calls systemd-notify with the message (no NOTIFY_SOCKET required)", () => {
+    it("calls systemd-notify with the given message", () => {
       notifySystemd("READY=1");
       expect(mockSpawnSync).toHaveBeenCalledWith("systemd-notify", ["READY=1"], { stdio: "ignore" });
     });

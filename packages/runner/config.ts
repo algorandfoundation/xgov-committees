@@ -18,7 +18,7 @@ const DEFAULT_CONFIG: Config = {
 
 export const config: Config = {
   algodServer: process.env.ALGOD_SERVER ?? DEFAULT_CONFIG.algodServer,
-  algodPort: parseInt(process.env.ALGOD_PORT ?? DEFAULT_CONFIG.algodPort.toString(), 10),
+  algodPort: process.env.ALGOD_PORT ? parseInt(process.env.ALGOD_PORT, 10) : DEFAULT_CONFIG.algodPort,
   algodToken: process.env.ALGOD_TOKEN ?? DEFAULT_CONFIG.algodToken,
-  registryAppId: parseInt(process.env.REGISTRY_APP_ID ?? DEFAULT_CONFIG.registryAppId.toString(), 10),
+  registryAppId: process.env.REGISTRY_APP_ID ? parseInt(process.env.REGISTRY_APP_ID, 10) : DEFAULT_CONFIG.registryAppId,
 };
