@@ -1,5 +1,4 @@
-import { readFile, readdir } from 'fs/promises';
-import { mkdirSync } from 'fs';
+import { readFile, readdir, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { encodeJSON, decodeJSON, BlockHeader } from 'algosdk';
 import { chunk, clearLine, fsExists, sleep } from '../utils';
@@ -51,7 +50,7 @@ export async function ensureCacheSubPathExists(subPath: string) {
   const cachePath = getCachePath(subPath);
   if (!(await fsExists(cachePath))) {
     console.log('Creating', cachePath);
-    await mkdirSync(cachePath, { recursive: true });
+    await mkdir(cachePath, { recursive: true });
   }
 }
 

@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { ensureCacheSubPathExists as ensureCacheSubPathExists } from './cache';
+import { ensureCacheSubPathExists } from './cache';
 import { getCachePath } from './cache/utils';
 import { readFile, writeFile } from 'fs/promises';
 import { networkMetadata } from './algod';
