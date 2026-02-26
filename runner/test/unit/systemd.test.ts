@@ -6,7 +6,7 @@ import { assert, describe, expect, it } from "vitest";
 describe("systemd units", () => {
   assert(
     spawnSync("systemd-analyze", ["--version"], { timeout: 3000 }).status === 0,
-    "systemd-analyze is required (run via pnpm test:unit)",
+    "systemd-analyze is required (run via npm run test:unit)",
   );
 
   it("pass systemd-analyze verify", () => {

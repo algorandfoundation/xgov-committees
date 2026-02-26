@@ -9,12 +9,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
  && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g pnpm
 RUN useradd --system --no-create-home xgov-committee-runner
 
 WORKDIR /opt/xgov-committees/runner
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 
 # ── unit-test ─────────────────────────────────────────────────────────────────
@@ -28,7 +27,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends systemd-sysv \
  && rm -rf /var/lib/apt/lists/*
 
-RUN pnpm run build
+RUN npm run build
 RUN chown -R root:xgov-committee-runner /opt/xgov-committees \
  && chmod -R u=rwX,g=rX,o= /opt/xgov-committees
 
