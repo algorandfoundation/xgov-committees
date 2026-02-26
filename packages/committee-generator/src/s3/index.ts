@@ -7,16 +7,16 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
-} from "@aws-sdk/client-s3";
-import { networkMetadata } from "../algod";
-import { config } from "../config";
-import { createReadStream } from "fs";
-import { stat as fsStat } from "fs/promises";
-import pMap from "p-map";
-import { formatBytes } from "../cache/utils";
-import { committeeIdToSafeFileName, walkDir } from "../utils";
-import { relative } from "path";
-import { getCommitteeID, loadCommittee } from "../committee";
+} from '@aws-sdk/client-s3';
+import { networkMetadata } from '../algod';
+import { config } from '../config';
+import { createReadStream } from 'fs';
+import { stat as fsStat } from 'fs/promises';
+import pMap from 'p-map';
+import { formatBytes } from '../cache/utils';
+import { committeeIdToSafeFileName, walkDir } from '../utils';
+import { relative } from 'path';
+import { getCommitteeID, loadCommittee } from '../committee';
 
 const {
   s3: { bucketName, region, endpoint, accessKeyId, secretAccessKey, publicUrl },
@@ -28,7 +28,7 @@ let s3Client: S3Client | null = null;
 export function getS3Client(): S3Client {
   if (!accessKeyId || !secretAccessKey) {
     throw new Error(
-      "S3 credentials are not fully configured. Please set S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY in your environment variables.",
+      'S3 credentials are not fully configured. Please set S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY in your environment variables.',
     );
   }
 
@@ -69,9 +69,7 @@ export async function deleteDirectory(dirPrefix: string): Promise<void> {
         ContinuationToken: continuationToken,
       };
 
-      const listResponse = await client.send(
-        new ListObjectsV2Command(listParams),
-      );
+      const listResponse = await client.send(new ListObjectsV2Command(listParams));
 
       const objects = listResponse.Contents;
 
@@ -100,10 +98,10 @@ export async function deleteDirectory(dirPrefix: string): Promise<void> {
     }
 
     if (config.verbose) {
-      console.log("Directory deletion complete.");
+      console.log('Directory deletion complete.');
     }
   } catch (err) {
-    console.error("Error deleting directory:", err);
+    console.error('Error deleting directory:', err);
     throw err;
   }
 }
@@ -127,8 +125,8 @@ export async function objectExists(key: string): Promise<boolean> {
     };
     if (
       err?.$metadata?.httpStatusCode === 404 ||
-      err?.name === "NotFound" ||
-      err?.Code === "NotFound"
+      err?.name === 'NotFound' ||
+      err?.Code === 'NotFound'
     ) {
       return false;
     }
@@ -174,7 +172,7 @@ async function getShortcutKeysForPeriod(
   fromRound: number,
   toRound: number,
 ): Promise<[string, string]> {
-  const committee = await loadCommittee(fromRound, toRound, "s3");
+  const committee = await loadCommittee(fromRound, toRound, 's3');
 
   if (!committee) {
     throw new Error(
@@ -197,12 +195,10 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
   const client = getS3Client();
 
   if (config.verbose) {
-    console.log("Ensuring committee shortcuts exist in S3...");
+    console.log('Ensuring committee shortcuts exist in S3...');
   }
 
-  const keys = await listKeysWithPrefix(
-    getKeyWithNetworkMetadata("committee/"),
-  );
+  const keys = await listKeysWithPrefix(getKeyWithNetworkMetadata('committee/'));
 
   const copyTasks: Promise<void>[] = [];
 
@@ -211,16 +207,10 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
 
     if (!match) continue;
 
-    const [fromRound, toRound] = [
-      parseInt(match[1], 10),
-      parseInt(match[2], 10),
-    ];
+    const [fromRound, toRound] = [parseInt(match[1], 10), parseInt(match[2], 10)];
 
     try {
-      const [endRoundKey, committeeIDKey] = await getShortcutKeysForPeriod(
-        fromRound,
-        toRound,
-      );
+      const [endRoundKey, committeeIDKey] = await getShortcutKeysForPeriod(fromRound, toRound);
       const [endRoundExists, committeeIDExists] = await Promise.all([
         objectExists(endRoundKey),
         objectExists(committeeIDKey),
@@ -275,10 +265,7 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
         );
       }
     } catch (err) {
-      console.error(
-        `Error processing committee shortcuts ${fromRound}-${toRound}:`,
-        err,
-      );
+      console.error(`Error processing committee shortcuts ${fromRound}-${toRound}:`, err);
     }
   }
 
@@ -294,9 +281,7 @@ export async function syncDirectory(directoryPath: string) {
 
   const files = await walkDir(directoryPath);
   const fileToKey = (filePath: string) =>
-    getKeyWithNetworkMetadata(
-      relative(directoryPath, filePath).replace(/\\/g, "/"),
-    );
+    getKeyWithNetworkMetadata(relative(directoryPath, filePath).replace(/\\/g, '/'));
   const keys = files.map(fileToKey);
 
   // Optimize existence checks:
@@ -305,7 +290,7 @@ export async function syncDirectory(directoryPath: string) {
   const topPrefixes = new Set<string>();
   const rootKeys: string[] = [];
   for (const key of keys) {
-    const firstSlash = key.indexOf("/");
+    const firstSlash = key.indexOf('/');
     if (firstSlash === -1) {
       rootKeys.push(key);
     } else {
@@ -313,9 +298,7 @@ export async function syncDirectory(directoryPath: string) {
     }
   }
 
-  console.log(
-    `Checking which objects already exist in bucket "${bucketName}"...`,
-  );
+  console.log(`Checking which objects already exist in bucket "${bucketName}"...`);
   const existingKeys = new Set<string>();
 
   // List under each top-level prefix, in parallel.
@@ -347,9 +330,7 @@ export async function syncDirectory(directoryPath: string) {
     if (!existingKeys.has(key)) filesToUpload.push(filePath);
   }
 
-  console.log(
-    `Uploading directory "${directoryPath}" to bucket "${bucketName}"...`,
-  );
+  console.log(`Uploading directory "${directoryPath}" to bucket "${bucketName}"...`);
   console.log(
     `${filesToUpload.length} files to upload, ${files.length - filesToUpload.length} already in bucket`,
   );
@@ -377,9 +358,7 @@ export async function syncDirectory(directoryPath: string) {
       uploadedCount++;
       uploadedBytes += size;
       if (uploadedCount % 250 === 0 || uploadedCount === filesToUpload.length) {
-        console.log(
-          `Progress: ${uploadedCount}/${filesToUpload.length} uploaded`,
-        );
+        console.log(`Progress: ${uploadedCount}/${filesToUpload.length} uploaded`);
       }
     },
     { concurrency: UPLOAD_CONCURRENCY },
@@ -393,9 +372,7 @@ export async function syncDirectory(directoryPath: string) {
   console.log(
     `Upload summary: ${filesToUpload.length} files uploaded in ${elapsedSec.toFixed(2)}s (${filesPerSec.toFixed(2)} files/s)`,
   );
-  console.log(
-    `Transferred ${formatBytes(uploadedBytes)} (${formatBytes(bytesPerSec)}/s)`,
-  );
+  console.log(`Transferred ${formatBytes(uploadedBytes)} (${formatBytes(bytesPerSec)}/s)`);
 }
 
 /**
@@ -409,26 +386,24 @@ export async function syncDirectory(directoryPath: string) {
  * @returns {Promise<string | undefined>} Resolves with the object's ETag value (without surrounding quotes),
  * or undefined if not found. Throws on error.
  */
-export async function getMD5HashForObject(
-  key: string,
-): Promise<string | undefined> {
+export async function getMD5HashForObject(key: string): Promise<string | undefined> {
   if (!publicUrl) {
-    throw new Error("S3 public URL is not configured");
+    throw new Error('S3 public URL is not configured');
   }
 
-  const url = `${publicUrl.replace(/\/$/, "")}/${key}`;
-  const response = await fetch(url, { method: "HEAD" });
+  const url = `${publicUrl.replace(/\/$/, '')}/${key}`;
+  const response = await fetch(url, { method: 'HEAD' });
   if (response.status === 404) {
     return undefined;
   }
 
-  const etag = response.headers.get("ETag");
+  const etag = response.headers.get('ETag');
   if (!etag) {
     throw new Error(`ETag header not found for ${url}`);
   }
 
   // ETag is usually in quotes, remove them
-  return etag.replace(/"/g, "");
+  return etag.replace(/"/g, '');
 }
 
 /**
@@ -464,10 +439,7 @@ export async function getData(key: string): Promise<any> {
  * @param data string or buffer data to upload
  * @returns {Promise<void>} Resolves when upload is complete
  */
-export async function uploadData(
-  key: string,
-  data: string | Uint8Array | Buffer,
-): Promise<void> {
+export async function uploadData(key: string, data: string | Uint8Array | Buffer): Promise<void> {
   const client = getS3Client();
 
   if (config.verbose) {
@@ -491,7 +463,7 @@ export async function uploadData(
 export function getKeyWithNetworkMetadata(keySuffix: string): string {
   const { genesisID, genesisHash } = networkMetadata;
 
-  const networkPrefix = `${genesisID}-${genesisHash.replace(/[\/=]/g, "_")}`;
+  const networkPrefix = `${genesisID}-${genesisHash.replace(/[\/=]/g, '_')}`;
 
   return `${networkPrefix}/${keySuffix}`;
 }
@@ -503,8 +475,8 @@ export function getKeyWithNetworkMetadata(keySuffix: string): string {
  */
 export function getPublicUrlForObject(keySuffix: string): string {
   if (!publicUrl) {
-    throw new Error("S3 public URL is not configured");
+    throw new Error('S3 public URL is not configured');
   }
 
-  return `${publicUrl.replace(/\/$/, "")}/${getKeyWithNetworkMetadata(keySuffix)}`;
+  return `${publicUrl.replace(/\/$/, '')}/${getKeyWithNetworkMetadata(keySuffix)}`;
 }

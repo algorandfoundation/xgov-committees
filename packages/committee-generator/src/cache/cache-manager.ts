@@ -1,9 +1,9 @@
-import { join } from "path";
-import { CACHE_MAX_PAGES, CACHE_PAGE_SIZE, CachePage } from "./cache-page";
-import { getCachePath } from "./utils";
-import { fsExists, sleep } from "../utils";
-import { config } from "../config";
-import { fetchPageFromS3 } from "./s3-cache";
+import { join } from 'path';
+import { CACHE_MAX_PAGES, CACHE_PAGE_SIZE, CachePage } from './cache-page';
+import { getCachePath } from './utils';
+import { fsExists, sleep } from '../utils';
+import { config } from '../config';
+import { fetchPageFromS3 } from './s3-cache';
 
 export function getPageStartRnd(rnd: number) {
   return Math.floor(rnd / CACHE_PAGE_SIZE) * CACHE_PAGE_SIZE;
@@ -18,7 +18,7 @@ export class CacheManager {
   useS3 = false;
 
   constructor(maxPages = CACHE_MAX_PAGES, useS3 = false) {
-    this.cachePath = getCachePath("blocks");
+    this.cachePath = getCachePath('blocks');
     this.maxPages = maxPages;
     this.useS3 = useS3;
   }
@@ -74,9 +74,7 @@ export class CacheManager {
       (q = new Promise(async (resolve, reject) => {
         try {
           if (config.verbose)
-            console.debug(
-              `\nLoading ${pageStart} numPages:${this.numPages} max:${this.maxPages}`,
-            );
+            console.debug(`\nLoading ${pageStart} numPages:${this.numPages} max:${this.maxPages}`);
           if (this.numPages > this.maxPages) {
             await this.evictPage();
           }
@@ -108,12 +106,10 @@ export class CacheManager {
   }
 
   get oldestPage() {
-    return [...this.pages.entries()].reduce(
-      ([leastUsedRnd, leastUsedPage], [rnd, page]) => {
-        if (leastUsedPage?.lastAccess > page.lastAccess) return [rnd, page];
-        return [leastUsedRnd, leastUsedPage];
-      },
-    );
+    return [...this.pages.entries()].reduce(([leastUsedRnd, leastUsedPage], [rnd, page]) => {
+      if (leastUsedPage?.lastAccess > page.lastAccess) return [rnd, page];
+      return [leastUsedRnd, leastUsedPage];
+    });
   }
 
   hasDirty() {
@@ -126,9 +122,7 @@ export class CacheManager {
       await page.evict();
       this.pages.delete(pageStart);
       if (config.verbose)
-        console.debug(
-          `Evicting ${pageStart} numPages:${this.numPages} max:${this.maxPages}`,
-        );
+        console.debug(`Evicting ${pageStart} numPages:${this.numPages} max:${this.maxPages}`);
       await sleep(50);
     }
   }
@@ -159,25 +153,19 @@ export class CacheManager {
 
 export const cacheManager = new CacheManager(
   CACHE_MAX_PAGES,
-  config.cacheMode === "write-cache", // useS3 only in write-cache mode
+  config.cacheMode === 'write-cache', // useS3 only in write-cache mode
 );
 
-for (const sig of [
-  "SIGTERM",
-  "SIGINT",
-  "uncaughtException",
-  "unhandledRejection",
-  "beforeExit",
-]) {
+for (const sig of ['SIGTERM', 'SIGINT', 'uncaughtException', 'unhandledRejection', 'beforeExit']) {
   process.on(sig, gracefulExit);
   async function gracefulExit() {
     if (cacheManager.hasDirty()) {
-      console.log("\nFlushing data to disk before exit");
+      console.log('\nFlushing data to disk before exit');
       try {
         await cacheManager.evictAllPages();
-        console.log("OK");
+        console.log('OK');
       } catch (e) {
-        console.error("While shutting down:", e);
+        console.error('While shutting down:', e);
       }
     }
     process.exit(0);

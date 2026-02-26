@@ -1,21 +1,17 @@
-import pMap from "p-map";
-import { getBlock } from "./blocks";
-import { chunk, clearLine, fsExists, makeRndsArray, sleep } from "./utils";
-import { writeFile, readFile } from "fs/promises";
-import { join } from "path";
-import { ensureCacheSubPathExists } from "./cache";
-import { getCachePath } from "./cache/utils";
-import { CACHE_PAGE_SIZE } from "./cache/cache-page";
-import {
-  getKeyWithNetworkMetadata,
-  getPublicUrlForObject,
-  uploadData,
-} from "./s3";
+import pMap from 'p-map';
+import { getBlock } from './blocks';
+import { chunk, clearLine, fsExists, makeRndsArray, sleep } from './utils';
+import { writeFile, readFile } from 'fs/promises';
+import { join } from 'path';
+import { ensureCacheSubPathExists } from './cache';
+import { getCachePath } from './cache/utils';
+import { CACHE_PAGE_SIZE } from './cache/cache-page';
+import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
 
 export type ProposerMap = Map<string, number[]>;
 
-const label = "proposers";
-const cacheSubPath = "proposers";
+const label = 'proposers';
+const cacheSubPath = 'proposers';
 
 /*
  * Create proposer map of [proposer] -> proposed_round[]
@@ -30,11 +26,7 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
     await pMap(
       chunked,
       async (rnd) => {
-        const {
-          proposer: proposerAddr,
-          round,
-          genesisHash,
-        } = await getBlock(rnd);
+        const { proposer: proposerAddr, round, genesisHash } = await getBlock(rnd);
         const proposer = proposerAddr.toString();
 
         const existingRounds = proposers.get(proposer) ?? [];
@@ -42,9 +34,7 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
 
         processed++;
         const percent = ((100 * processed) / total).toFixed(2);
-        process.stdout.write(
-          `\rBlock proposer:\t${rnd} ${processed}/${total} ${percent}%   `,
-        );
+        process.stdout.write(`\rBlock proposer:\t${rnd} ${processed}/${total} ${percent}%   `);
       },
       { concurrency: 100 },
     );
@@ -70,7 +60,7 @@ function parseAndValidateProposerMap(
   toBlock: number,
 ): ProposerMap {
   const map: ProposerMap = new Map();
-  const lines = fileContents.split("\n").filter(Boolean);
+  const lines = fileContents.split('\n').filter(Boolean);
   let lineNum = 0;
   for (const line of lines) {
     const propRnds = JSON.parse(line);
@@ -79,9 +69,7 @@ function parseAndValidateProposerMap(
       throw new Error(`No proposer found in line ${lineNum}`);
     }
     if (map.has(proposer)) {
-      throw new Error(
-        `Duplicate proposer ${proposer} found in line ${lineNum}`,
-      );
+      throw new Error(`Duplicate proposer ${proposer} found in line ${lineNum}`);
     }
     map.set(proposer, propRnds[proposer]);
     lineNum++;
@@ -90,15 +78,13 @@ function parseAndValidateProposerMap(
   for (const [proposer, rnds] of map.entries()) {
     for (const rnd of rnds) {
       if (!expectedRounds.has(rnd)) {
-        throw new Error(
-          `Unexpected or duplicate round ${rnd} found for proposer ${proposer}`,
-        );
+        throw new Error(`Unexpected or duplicate round ${rnd} found for proposer ${proposer}`);
       }
       expectedRounds.delete(rnd);
     }
   }
   if (expectedRounds.size) {
-    const rndsStr = [...expectedRounds.values()].join(" ");
+    const rndsStr = [...expectedRounds.values()].join(' ');
     throw new Error(`Proposers cache incomplete, missing rounds: ${rndsStr}`);
   }
   return map;
@@ -111,12 +97,10 @@ function parseAndValidateProposerMap(
 export async function loadProposers(
   fromBlock: number,
   toBlock: number,
-  from: "local" | "s3" = "local",
+  from: 'local' | 's3' = 'local',
 ): Promise<ProposerMap | undefined> {
-  if (from === "s3") {
-    const url = getPublicUrlForObject(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.jsons`,
-    );
+  if (from === 's3') {
+    const url = getPublicUrlForObject(`${cacheSubPath}/${fromBlock}-${toBlock}.jsons`);
     try {
       const res = await fetch(url);
       if (res.status === 404) return;
@@ -154,12 +138,10 @@ export async function saveProposers(
   fromBlock: number,
   toBlock: number,
   proposers: ProposerMap,
-  to: "local" | "s3" = "local",
+  to: 'local' | 's3' = 'local',
 ) {
-  if (to === "s3") {
-    const key = getKeyWithNetworkMetadata(
-      `${cacheSubPath}/${fromBlock}-${toBlock}.jsons`,
-    );
+  if (to === 's3') {
+    const key = getKeyWithNetworkMetadata(`${cacheSubPath}/${fromBlock}-${toBlock}.jsons`);
 
     return await uploadData(key, serializeProposers(proposers));
   }
@@ -176,15 +158,13 @@ export async function saveProposers(
 export function serializeProposers(proposers: ProposerMap) {
   let s = ``;
   // sort proposers for deterministic output
-  for (const [proposer, rounds] of Array.from(proposers.entries()).sort(
-    ([a], [b]) => {
-      const aStr = String(a);
-      const bStr = String(b);
-      return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
-    },
-  )) {
+  for (const [proposer, rounds] of Array.from(proposers.entries()).sort(([a], [b]) => {
+    const aStr = String(a);
+    const bStr = String(b);
+    return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
+  })) {
     // sort rounds for deterministic output
-    s += JSON.stringify({ [proposer]: rounds.sort((a, b) => a - b) }) + "\n";
+    s += JSON.stringify({ [proposer]: rounds.sort((a, b) => a - b) }) + '\n';
   }
   return s;
 }
