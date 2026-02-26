@@ -1,19 +1,17 @@
 import { join } from 'path';
 import { config } from '../config';
 import {
-  getData,
   getKeyWithNetworkMetadata,
   getMD5HashForObject,
   getPublicUrlForObject,
   objectExists,
   uploadData,
 } from '../s3';
-import { clearLine, downloadToFile, formatDuration } from '../utils';
+import { clearLine, downloadToFile, formatDuration, getMD5Hash } from '../utils';
 import pMap from 'p-map';
 import { ensureCacheSubPathExists } from '.';
 import { getCachePath } from './utils';
 import { CACHE_PAGE_SIZE } from './cache-page';
-import { createHash } from 'crypto';
 import { readFile } from 'fs/promises';
 import { cacheManager } from './cache-manager';
 
@@ -46,7 +44,7 @@ export async function validateBlockPage(
   const fileBuffer = await readFile(cacheManager.getBlockCacheFilePath(pageStartRnd));
 
   // compute MD5 hash of local file contents (bytes) to match S3 behavior
-  const localMD5Hash = createHash('md5').update(fileBuffer).digest('hex');
+  const localMD5Hash = getMD5Hash(fileBuffer);
 
   // compare hashes and throw if mismatch
   if (s3MD5Hash !== localMD5Hash) {

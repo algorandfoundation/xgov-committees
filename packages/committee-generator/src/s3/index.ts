@@ -14,7 +14,7 @@ import { createReadStream } from 'fs';
 import { stat as fsStat } from 'fs/promises';
 import pMap from 'p-map';
 import { formatBytes } from '../cache/utils';
-import { committeeIdToSafeFileName, walkDir } from '../utils';
+import { committeeIdToSafeFileName, getMD5Hash, walkDir } from '../utils';
 import { relative } from 'path';
 import { getCommitteeID, loadCommittee } from '../committee';
 
@@ -434,13 +434,31 @@ export async function getData(key: string): Promise<any> {
 }
 
 /**
- * Upload data to S3 under the specified key.
+ * Upload data to S3 under the specified key. If it already exists and the MD5 matches, the upload is skipped.
  * @param key S3 key to upload under
  * @param data string or buffer data to upload
+ * @param force if true, forces upload even if the object already exists (default: false)
+ * @throws Will throw an error if the upload fails
  * @returns {Promise<void>} Resolves when upload is complete
  */
-export async function uploadData(key: string, data: string | Uint8Array | Buffer): Promise<void> {
+export async function uploadData(
+  key: string,
+  data: string | Uint8Array | Buffer,
+  force: boolean = false,
+): Promise<void> {
   const client = getS3Client();
+
+  if (!force) {
+    const existingMD5 = await getMD5HashForObject(key);
+    const newMD5 = getMD5Hash(data);
+
+    if (existingMD5 === newMD5) {
+      if (config.verbose) {
+        console.log(`Skipping upload for s3://${bucketName}/${key}, data is unchanged.`);
+      }
+      return;
+    }
+  }
 
   if (config.verbose) {
     console.log(`Uploading data to s3://${bucketName}/${key}...`);
