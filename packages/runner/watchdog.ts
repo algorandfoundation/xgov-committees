@@ -1,3 +1,7 @@
+/**
+ * Code responsible for pinging the systemd watchdog to prevent it from killing the process.
+ */
+
 import { spawnSync } from "node:child_process";
 
 // Value tied to `WatchdogSec=65` in the systemd service file
