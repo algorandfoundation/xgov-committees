@@ -10,10 +10,11 @@ import {
   loadCandidateCommittee,
 } from '../candidate-committee';
 import { getCommittee, saveCommittee, loadCommittee, getCommitteeID } from '../committee';
-import { getBlockProposers, saveProposers, loadProposers, serializeProposers } from '../proposers';
+import { getBlockProposers, saveProposers, serializeProposers } from '../proposers';
 import { getSubscribedXgovs, saveSubscribedXgovs, loadSubscribedXgovs } from '../subscribed-xgovs';
-import { makeRndsArray } from '../utils';
+import { getMD5Hash, makeRndsArray } from '../utils';
 import { config } from '../config';
+import { getKeyWithNetworkMetadata, getMD5HashForObject } from '../s3';
 
 const { registryAppId } = config;
 
@@ -67,17 +68,20 @@ export async function runValidateCache(fromBlock: number, toBlock: number): Prom
   const proposers = await getBlockProposers(rnds);
   await saveProposers(fromBlock, toBlock, proposers, 'local');
 
-  // read and compare proposers from S3 and local cache
-  const s3Proposers = await loadProposers(fromBlock, toBlock, 's3');
+  // read and compare proposers MD5 from S3 and local cache
+  const s3ProposersHash = await getMD5HashForObject(
+    getKeyWithNetworkMetadata(`proposers/${fromBlock}-${toBlock}.jsons`),
+  );
 
-  if (!s3Proposers) {
+  if (!s3ProposersHash) {
     throw new Error(`Proposers not found in S3 cache for blocks ${fromBlock}-${toBlock}.`);
   }
 
-  // compare s3 and local proposers (sort keys for consistent comparison)
-  if (serializeProposers(s3Proposers) !== serializeProposers(proposers)) {
+  const localProposersHash = getMD5Hash(serializeProposers(proposers));
+
+  if (s3ProposersHash !== localProposersHash) {
     throw new Error(
-      `Validation failed! Proposers from S3 does not match local proposers for blocks ${fromBlock}-${toBlock}.`,
+      `Validation failed! Proposers from S3 does not match local proposers for blocks ${fromBlock}-${toBlock}. S3 proposers MD5: ${s3ProposersHash}, Local proposers MD5: ${localProposersHash}`,
     );
   }
 
