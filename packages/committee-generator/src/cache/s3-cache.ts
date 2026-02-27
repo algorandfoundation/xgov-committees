@@ -7,7 +7,7 @@ import {
   objectExists,
   uploadData,
 } from '../s3';
-import { clearLine, downloadToFile, formatDuration, getMD5Hash } from '../utils';
+import { clearLine, downloadToFile, formatDuration, fsExists, getMD5Hash } from '../utils';
 import pMap from 'p-map';
 import { ensureCacheSubPathExists } from '.';
 import { getCachePath } from './utils';
@@ -77,8 +77,39 @@ export async function downloadBlockPages(fromBlock: number, toBlock: number): Pr
 
   // Progress tracking state
   let downloaded = 0;
+  let skipped = 0;
+  let redownloaded = 0;
+  let newFiles = 0;
   const total = targetPages.length;
   const startTime = Date.now();
+
+  // Helper function to update progress display
+  const updateProgress = () => {
+    const percent = total > 0 ? ((100 * downloaded) / total).toFixed(2) : '0.00';
+    const elapsed = (Date.now() - startTime) / 1000;
+
+    let rate = '';
+    if (elapsed > 0 && downloaded > 0) {
+      const pagesPerSec = (downloaded / elapsed).toFixed(2);
+      const remaining = total - downloaded;
+
+      // Show ETA only if there are remaining pages
+      if (remaining > 0) {
+        const eta = formatDuration(remaining / (downloaded / elapsed));
+        rate = ` ${pagesPerSec} pages/sec ETA ${eta}`;
+      } else {
+        rate = ` ${pagesPerSec} pages/sec`;
+      }
+    }
+
+    if (!config.verbose) {
+      process.stdout.write(
+        `\rDownloading pages:\t${downloaded}/${total} ${percent}%${rate}        `,
+      );
+    } else if (downloaded % 25 === 0 || downloaded === total) {
+      console.log(`Progress: ${downloaded}/${total} pages processed (${percent}%)${rate}`);
+    }
+  };
 
   await pMap(
     targetPages,
@@ -87,26 +118,62 @@ export async function downloadBlockPages(fromBlock: number, toBlock: number): Pr
       const url = getPublicUrlForObject(`blocks/${pageName}`);
       const fileName = join(blockCachePath, pageName);
 
+      // if file already exists locally, compare MD5 hash with S3 before deciding to skip or redownload
+      if (await fsExists(fileName)) {
+        try {
+          // read local file and compute MD5 hash
+          const localMD5Hash = getMD5Hash(await readFile(fileName));
+
+          // get hash of object on s3
+          const s3MD5Hash = await getMD5HashForObject(
+            getKeyWithNetworkMetadata(`blocks/${pageName}`),
+          );
+
+          // does the hash match? if so, skip download. if not, redownload and overwrite local file
+          if (localMD5Hash === s3MD5Hash) {
+            // Skip download
+            if (config.verbose) {
+              console.debug(`Cached: ${pageName} (MD5: ${localMD5Hash})`);
+            }
+            downloaded++;
+            skipped++;
+            updateProgress();
+            return;
+          } else {
+            // Hash mismatch - redownload
+            if (config.verbose) {
+              console.warn(`Hash mismatch for ${pageName}, re-downloading...`);
+              console.warn(`Local: ${localMD5Hash}, S3: ${s3MD5Hash}`);
+            }
+            redownloaded++;
+          }
+        } catch (error) {
+          // File exists but couldn't read it - log and redownload
+          console.warn(`Error reading ${pageName}: ${(error as Error).message}, re-downloading...`);
+          redownloaded++;
+        }
+      } else {
+        // File doesn't exist - download
+        if (config.verbose) {
+          console.debug(`New file: ${pageName}, downloading...`);
+        }
+        newFiles++;
+      }
+
       await downloadToFile(url, fileName);
-
-      // Update progress
       downloaded++;
-      const percent = ((100 * downloaded) / total).toFixed(2);
-      const elapsed = (Date.now() - startTime) / 1000;
-      const rate =
-        elapsed > 0
-          ? ` ${(downloaded / elapsed).toFixed(2)} pages/sec ETA ${formatDuration((total - downloaded) / (downloaded / elapsed))}`
-          : '';
-
-      process.stdout.write(
-        `\rDownloading pages:\t${downloaded}/${total} ${percent}%${rate}        `,
-      );
+      updateProgress();
     },
     { concurrency: config.concurrency },
   );
 
-  clearLine();
-  process.stdout.write(`Download complete:\t${total} pages OK\n`);
+  // Clear progress bar line only if it was shown
+  if (!config.verbose) {
+    clearLine();
+  }
+  process.stdout.write(
+    `Download complete:\t${total} pages (${skipped} cached, ${newFiles} new, ${redownloaded} updated)\n`,
+  );
 }
 
 /**
