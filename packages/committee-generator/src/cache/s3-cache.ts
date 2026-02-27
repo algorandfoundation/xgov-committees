@@ -1,12 +1,6 @@
 import { join } from 'path';
 import { config } from '../config';
-import {
-  getKeyWithNetworkMetadata,
-  getMD5HashForObject,
-  getPublicUrlForObject,
-  objectExists,
-  uploadData,
-} from '../s3';
+import { getKeyWithNetworkMetadata, getMD5HashForObject, getPublicUrlForObject } from '../s3';
 import { clearLine, downloadToFile, formatDuration, fsExists, getMD5Hash } from '../utils';
 import pMap from 'p-map';
 import { ensureCacheSubPathExists } from '.';
@@ -174,57 +168,4 @@ export async function downloadBlockPages(fromBlock: number, toBlock: number): Pr
   process.stdout.write(
     `Download complete:\t${total} pages (${skipped} cached, ${newFiles} new, ${redownloaded} updated)\n`,
   );
-}
-
-/**
- * Fetches a cache page from S3.
- * Returns the parsed page data if found, undefined if not found.
- * Throws on errors (caller should handle gracefully).
- */
-export async function fetchPageFromS3(pageStart: number): Promise<CachePagePayload | undefined> {
-  const url = getPublicUrlForObject(`blocks/${pageStart}.json`); // For backward compatibility with old key format
-
-  console.log(`Fetching S3 page: ${url}`);
-
-  try {
-    const res = await fetch(url);
-    if (res.status === 404) return undefined;
-    if (!res.ok) throw new Error(`Fetching ${url} failed: ${res.status}`);
-    const data = await res.json();
-
-    if (config.verbose) {
-      console.debug(`S3 cache hit: ${url}`);
-    }
-
-    return data as CachePagePayload;
-  } catch (error) {
-    if (config.verbose) {
-      console.debug(`S3 cache miss: ${url}`);
-    }
-    throw error;
-  }
-}
-
-/**
- * Uploads a cache page to S3.
- * Throws on error (caller should handle gracefully).
- */
-export async function uploadPageToS3(pageStart: number, data: CachePagePayload): Promise<void> {
-  const key = getKeyWithNetworkMetadata(`blocks/${pageStart}.json`); // For backward compatibility with old key format
-
-  await uploadData(key, JSON.stringify(data));
-
-  if (config.verbose) {
-    console.debug(`Uploaded to S3: ${key}`);
-  }
-}
-
-/**
- * Checks if a cache page exists in S3 without downloading it.
- * Returns true if exists, false if not found.
- * Throws on errors (caller should handle gracefully).
- */
-export async function pageExistsS3(pageStart: number): Promise<boolean> {
-  const key = getKeyWithNetworkMetadata(`blocks/${pageStart}.json`); // For backward compatibility with old key format
-  return objectExists(key);
 }
