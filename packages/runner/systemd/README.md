@@ -61,7 +61,7 @@ Empty section, omitted. The service is triggered exclusively by the timer. `[Ins
 OnUnitInactiveSec=50min
 ```
 
-Re-triggers the service 50 minutes after its completion. Combined with an expected ~10 minute run time, this produces a ~60 minute cycle.
+Re-triggers the service 50 minutes after its completion. Combined with an expected ~10 minute run time, this produces a ~60 minute cycle. TODO: decide whether to use `OnUnitInactiveSec` or `OnUnitActiveSec`.
 
 ```ini
 OnBootSec=0
