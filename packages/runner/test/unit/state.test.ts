@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -21,6 +21,12 @@ describe("state", () => {
   describe("loadState", () => {
     it("returns null when no state file exists", () => {
       expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)).toBeNull();
+    });
+
+    it("throws on corrupt state file", () => {
+      const safeHash = GENESIS_HASH.replace(/[/=]/g, "_");
+      writeFileSync(join(stateDir, `${safeHash}-${REGISTRY_APP_ID}.json`), "not json");
+      expect(() => loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)).toThrow();
     });
 
     it("returns the saved state when a file exists", () => {

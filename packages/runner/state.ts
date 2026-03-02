@@ -17,8 +17,9 @@ export function loadState(stateDir: string, genesisHash: string, registryAppId: 
   try {
     const raw = readFileSync(filePath, "utf8");
     return JSON.parse(raw) as RunnerState;
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err; // permission error, malformed JSON, disk error, etc.
   }
 }
 
