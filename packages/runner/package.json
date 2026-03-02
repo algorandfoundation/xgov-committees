@@ -17,6 +17,7 @@
     "test:integration": "vitest run test/integration"
   },
   "dependencies": {
+    "@algorandfoundation/algokit-utils": "^9.2.0",
     "dotenv": "^17.3.1"
   },
   "devDependencies": {
