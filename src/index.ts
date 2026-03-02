@@ -23,9 +23,9 @@ import { makeRndsArray, committeeIdToSafeFileName } from "./utils";
 
 await ensureCacheSubPathExists("blocks");
 
-const { fromBlock, toBlock, registryAppId } = config;
+const { fromBlock, toBlock, registryAppId, ggovMode } = config;
 
-let committee = await loadCommittee(fromBlock, toBlock);
+let committee = await loadCommittee(fromBlock, toBlock, ggovMode);
 
 if (!committee) {
   let candidateCommittee = await loadCandidateCommittee(fromBlock, toBlock);
@@ -45,10 +45,14 @@ if (!committee) {
     saveCandidateCommittee(fromBlock, toBlock, candidateCommittee);
   }
 
-  let subscribedxGovs = await loadSubscribedXgovs(fromBlock, toBlock);
-  if (!subscribedxGovs) {
+  let subscribedxGovs = ggovMode
+    ? undefined
+    : await loadSubscribedXgovs(fromBlock, toBlock);
+  if (!ggovMode && !subscribedxGovs) {
     subscribedxGovs = await getSubscribedXgovs();
-    await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs);
+    if (!ggovMode) {
+      await saveSubscribedXgovs(fromBlock, toBlock, subscribedxGovs);
+    }
   }
 
   committee = getCommittee(
@@ -56,9 +60,10 @@ if (!committee) {
     toBlock,
     registryAppId,
     candidateCommittee,
-    subscribedxGovs
+    subscribedxGovs,
+    ggovMode,
   );
-  await saveCommittee(fromBlock, toBlock, committee);
+  await saveCommittee(fromBlock, toBlock, committee, ggovMode);
 }
 
 const committeeID = getCommitteeID(committee);

@@ -57,9 +57,9 @@ export function sha512_256_raw(input: string | Buffer) {
   return Buffer.from(sha512_256(input), "hex")
 }
 
-export function committeeIdToSafeFileName(committeeId: Buffer): string {
+export function committeeIdToSafeFileName(committeeId: string): string {
   // Use base64url encoding (base64 without padding, using URL-safe characters)
-  return committeeId.toString("base64")
+  return committeeId
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");

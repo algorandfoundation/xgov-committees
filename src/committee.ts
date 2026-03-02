@@ -26,20 +26,28 @@ export type Committee = {
 
 const label = "committee";
 const cacheSubPath = "committee";
+const ggovCacheSubPath = "ggov-committee";
 
 export function getCommittee(
   fromBlock: number,
   toBlock: number,
   registryAppId: number,
   candidateCommittee: CandidateCommittee,
-  subscribedxGovs: XGovsRecord,
+  subscribedxGovs: XGovsRecord | undefined,
+  ggovMode: boolean,
 ): Committee {
+  if (!ggovMode && subscribedxGovs === undefined) {
+    throw new Error("subscribedxGovs cannot be undefined if not in ggov mode");
+  }
+
   let totalMembers = 0;
   let totalVotes = 0;
-  const subscribed = Object.keys(subscribedxGovs)
+  const subscribed = subscribedxGovs ? Object.keys(subscribedxGovs) : [];
 
   const xGovs = Object.entries(candidateCommittee)
-    .filter(([proposer]) => subscribed.includes(proposer))
+    .filter(
+      ggovMode ? () => true : ([proposer]) => subscribed.includes(proposer),
+    )
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([address, votes]) => {
       totalMembers += 1;
@@ -57,16 +65,17 @@ export function getCommittee(
     xGovs,
   };
 
-  validateCommitteeString(JSON.stringify(committee))
+  validateCommitteeString(JSON.stringify(committee));
 
-  return committee
+  return committee;
 }
 
 export async function loadCommittee(
   fromBlock: number,
-  toBlock: number
+  toBlock: number,
+  ggovMode: boolean,
 ): Promise<Committee | undefined> {
-  const cachePath = getCachePath(cacheSubPath);
+  const cachePath = getCachePath(ggovMode ? ggovCacheSubPath : cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
 
   if (await fsExists(filePath)) {
@@ -87,11 +96,12 @@ export async function loadCommittee(
 export async function saveCommittee(
   fromBlock: number,
   toBlock: number,
-  committee: Committee
+  committee: Committee,
+  ggovMode: boolean,
 ): Promise<void> {
-  await ensureCacheSubPathExists(cacheSubPath);
+  await ensureCacheSubPathExists(ggovMode ? ggovCacheSubPath : cacheSubPath);
 
-  const cachePath = getCachePath(cacheSubPath);
+  const cachePath = getCachePath(ggovMode ? ggovCacheSubPath : cacheSubPath);
   const filePath = join(cachePath, `${fromBlock}-${toBlock}.json`);
   console.log(`Writing ${label} to ${filePath}`);
 
@@ -101,11 +111,10 @@ export async function saveCommittee(
 export function getCommitteeID(committee: Committee): string {
   // An xGov Committee is identified by the following identifier:
   // `SHA-512/256(arc0086||SHA-512/256(xGov Committee JSON))`
-  const committeeJSON = JSON.stringify(committee)
-  const committeeJSONHash = sha512_256_raw(committeeJSON)
-  const committeeIDHash = sha512_256_raw(Buffer.concat([
-    Buffer.from("arc0086"),
-    committeeJSONHash
-  ]))
-  return committeeIDHash.toString("base64")
+  const committeeJSON = JSON.stringify(committee);
+  const committeeJSONHash = sha512_256_raw(committeeJSON);
+  const committeeIDHash = sha512_256_raw(
+    Buffer.concat([Buffer.from("arc0086"), committeeJSONHash]),
+  );
+  return committeeIDHash.toString("base64");
 }

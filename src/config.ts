@@ -13,6 +13,7 @@ export type Config = {
   dataPath: string;
   concurrency: number;
   verbose: boolean;
+  ggovMode: boolean;
 };
 
 // Load environment variables from .env file
@@ -89,6 +90,14 @@ const argvConfig = [
     type: "boolean",
     description: "verbose mode",
     envVar: "VERBOSE",
+    defaultValue: false,
+  },
+  {
+    name: "ggov-mode",
+    short: "g",
+    type: "boolean",
+    description: "ggov mode",
+    envVar: "GGOV_MODE",
     defaultValue: false,
   },
 ];
