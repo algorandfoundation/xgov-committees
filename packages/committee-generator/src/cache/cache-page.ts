@@ -82,7 +82,7 @@ export class CachePage {
     this.pending.delete(promise);
 
     // we have a complete file on disk at this point, so we can safely upload to S3 if needed in 'write-cache' mode
-    if (this.dirty && config.cacheMode === 'write-cache') {
+    if (!this.dirty && config.cacheMode === 'write-cache') {
       await uploadData(getKeyWithNetworkMetadata(`blocks/${basename(this.filename)}`), contents);
     }
 
