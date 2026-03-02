@@ -1,5 +1,6 @@
 import { config } from "./config.ts";
 import { notifySystemd, startWatchdog } from "./watchdog.ts";
+import { run } from "./service.ts";
 
 console.log("xGov committee runner starting...");
 console.log(`  algod:      ${config.algodServer}:${config.algodPort}`);
@@ -10,7 +11,7 @@ notifySystemd("READY=1");
 
 const watchdogHandle = startWatchdog();
 
-// Service logic goes here.
+await run(config);
 
 clearInterval(watchdogHandle);
 notifySystemd("STOPPING=1");
