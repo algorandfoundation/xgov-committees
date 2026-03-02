@@ -165,13 +165,13 @@ export async function listKeysWithPrefix(prefix: string): Promise<Set<string>> {
  * Generate shortcut keys for committee data based on the period end round and committee ID, to allow fetching committee data from S3 by these identifiers.
  * @param fromRound from round
  * @param toRound to round
- * @returns {Promise<[string, string]>} [shortcutKeyByRound, shortcutKeyByCommitteeID]
+ * @returns {Promise<{ endRoundKey: string, committeeIDKey: string }>} Object containing shortcut keys
  * @throws if committee data is not found for the specified rounds
  */
 async function getShortcutKeysForPeriod(
   fromRound: number,
   toRound: number,
-): Promise<[string, string]> {
+): Promise<{ endRoundKey: string; committeeIDKey: string }> {
   const committee = await loadCommittee(fromRound, toRound, 's3');
 
   if (!committee) {
@@ -185,7 +185,10 @@ async function getShortcutKeysForPeriod(
 
   const baseKey = getKeyWithNetworkMetadata(`committee/`);
 
-  return [`${baseKey}${toRound}.json`, `${baseKey}${safeCommitteeID}.json`];
+  return {
+    endRoundKey: `${baseKey}${toRound}.json`,
+    committeeIDKey: `${baseKey}${safeCommitteeID}.json`,
+  };
 }
 
 /**
@@ -210,7 +213,7 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
     const [fromRound, toRound] = [parseInt(match[1], 10), parseInt(match[2], 10)];
 
     try {
-      const [endRoundKey, committeeIDKey] = await getShortcutKeysForPeriod(fromRound, toRound);
+      const { endRoundKey, committeeIDKey } = await getShortcutKeysForPeriod(fromRound, toRound);
       const [endRoundExists, committeeIDExists] = await Promise.all([
         objectExists(endRoundKey),
         objectExists(committeeIDKey),
