@@ -2,11 +2,12 @@ import dotenv from "dotenv";
 
 dotenv.config({ quiet: true, path: process.env.ENV });
 
-interface Config {
+export interface Config {
   algodServer: string;
   algodPort: number;
   algodToken: string;
   registryAppId: number;
+  stateDir: string;
 }
 
 const DEFAULT_CONFIG: Config = {
@@ -14,6 +15,7 @@ const DEFAULT_CONFIG: Config = {
   algodPort: 443,
   algodToken: "",
   registryAppId: 3147789458,
+  stateDir: "/var/lib/xgov-committee-runner",
 };
 
 export const config: Config = {
@@ -21,4 +23,5 @@ export const config: Config = {
   algodPort: process.env.ALGOD_PORT ? parseInt(process.env.ALGOD_PORT, 10) : DEFAULT_CONFIG.algodPort,
   algodToken: process.env.ALGOD_TOKEN ?? DEFAULT_CONFIG.algodToken,
   registryAppId: process.env.REGISTRY_APP_ID ? parseInt(process.env.REGISTRY_APP_ID, 10) : DEFAULT_CONFIG.registryAppId,
+  stateDir: process.env.STATE_DIR ?? DEFAULT_CONFIG.stateDir,
 };
