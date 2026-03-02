@@ -169,3 +169,32 @@ export async function downloadBlockPages(fromBlock: number, toBlock: number): Pr
     `Download complete:\t${total} pages (${skipped} cached, ${newFiles} new, ${redownloaded} updated)\n`,
   );
 }
+
+/**
+ * Fetch Cache Page from S3
+ * @param pageStart - Start round of required page
+ * @returns {Promise<CachePagePayload>} The page data fetched from S3
+ * @throws Will throw an error if the page is not found in S3 or if the fetch fails.
+ */
+export async function fetchPageFromS3(pageStart: number): Promise<CachePagePayload> {
+  const url = getPublicUrlForObject(`blocks/${pageStart}.json`);
+
+  if (config.verbose) {
+    console.debug(`Fetching page from S3: ${url}`);
+  }
+
+  const res = await fetch(url);
+  if (res.status === 404) {
+    throw new Error(`Page ${pageStart} not found in S3 cache`);
+  }
+  if (!res.ok) {
+    throw new Error(`Fetching ${url} failed: ${res.status}`);
+  }
+  const s3Data = await res.json();
+
+  if (config.verbose) {
+    console.debug(`S3 cache hit: ${url}`);
+  }
+
+  return s3Data as CachePagePayload;
+}

@@ -4,11 +4,10 @@ import { fsExists } from '../utils';
 import { config } from '../config';
 import { basename } from 'path';
 import { getKeyWithNetworkMetadata, uploadData } from '../s3';
+import { CachePagePayload, fetchPageFromS3 } from './s3-cache';
 
 export const CACHE_PAGE_SIZE = 1_000;
 export const CACHE_MAX_PAGES = 10;
-
-type CachePagePayload = Record<string, string>;
 
 export class CachePage {
   filename: string;
@@ -17,35 +16,30 @@ export class CachePage {
   dirty = false;
   lastAccess: number;
   pending = new Set<Promise<any>>();
-  readonly readOnly: boolean;
 
-  constructor({
-    filename,
-    contents,
-    readOnly = false,
-  }: {
-    filename: string;
-    contents?: Buffer;
-    readOnly?: boolean;
-  }) {
+  constructor({ filename, contents }: { filename: string; contents?: Buffer }) {
     this.filename = filename;
     this.diskHash = contents ? hashBuffer(contents) : undefined;
     this.data = contents ? JSON.parse(contents.toString()) : {};
     this.lastAccess = Date.now();
-    this.readOnly = readOnly;
   }
 
   /**
-   * Creates a read-only CachePage from S3 data.
-   * This page will never be saved to disk or marked as dirty.
+   * Fetches the page data from S3 and creates a CachePage instance after saving to disk.
+   * @param pageStart - Start round of the required page
+   * @param filename - The local filename to save the page data to
+   * @returns {Promise<CachePage>} A promise that resolves to a CachePage instance with the fetched data
+   * @throws Will throw an error if the page is not found in S3 or if the fetch/save process fails.
    */
-  static fromS3Data(pageStart: number, data: CachePagePayload): CachePage {
-    const page = new CachePage({
-      filename: `S3:${pageStart}`, // Virtual filename for debugging
-      readOnly: true,
-    });
-    page.data = data;
-    return page;
+  static async loadPageFromS3(pageStart: number, filename: string): Promise<CachePage> {
+    // load page from S3
+    const data = await fetchPageFromS3(pageStart);
+    // convert format
+    const contents = Buffer.from(JSON.stringify(data));
+    // Save to disk for local caching
+    await writeFile(filename, contents);
+    // load as normal
+    return new CachePage({ filename, contents });
   }
 
   static async loadPage(filename: string) {
@@ -87,8 +81,8 @@ export class CachePage {
     this.diskHash = hashBuffer(contents);
     this.pending.delete(promise);
 
-    // we have a complete file on disk at this point, so we can safely upload to S3 if needed
-    if (!this.dirty) {
+    // we have a complete file on disk at this point, so we can safely upload to S3 if needed in 'write-cache' mode
+    if (this.dirty && config.cacheMode === 'write-cache') {
       await uploadData(getKeyWithNetworkMetadata(`blocks/${basename(this.filename)}`), contents);
     }
 
@@ -98,11 +92,6 @@ export class CachePage {
   }
 
   async evict() {
-    // Skip eviction for read-only pages (from S3) - nothing to save
-    if (this.readOnly) {
-      return;
-    }
-
     // set() and savePage() races can lead to dirty-after-write
     while (this.dirty) {
       await this.savePage();
