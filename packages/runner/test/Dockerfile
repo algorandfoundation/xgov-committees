@@ -11,6 +11,7 @@ RUN ln -sf /usr/local/bin/node /usr/bin/node
 RUN useradd --system --no-create-home xgov-committee-runner
 
 WORKDIR /opt/xgov-committees/packages/runner
+# TODO: refactor to use the workspace root lock file instead.
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
