@@ -1,0 +1,13 @@
+{
+  "networkGenesisHash": "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=",
+  "periodEnd": 58000000,
+  "periodStart": 55000000,
+  "registryId": 3147789458,
+  "totalMembers": 3,
+  "totalVotes": 200,
+  "xGovs": [
+    { "address": "ROBOTMMVHPOETOTAX3J26UXYKVZX6QB7FHHYGBC44JNBUXMTABD5I3CODE", "votes": 100 },
+    { "address": "TESTADDRESS7EXAMPLE2ABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCD", "votes": 50 },
+    { "address": "ZOMBILANDSIUYQWIUYNKUYZVMCYY6IIT5IBAVNJYYWTVMQVZRBORLOP37E", "votes": 50 }
+  ]
+}

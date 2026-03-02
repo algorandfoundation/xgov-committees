@@ -7,6 +7,7 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import { networkMetadata } from '../algod';
 import { config } from '../config';
@@ -18,14 +19,19 @@ import { committeeIdToSafeFileName, getMD5Hash, walkDir } from '../utils';
 import { relative } from 'path';
 import { getCommitteeID, loadCommittee } from '../committee';
 
-const {
-  s3: { bucketName, region, endpoint, accessKeyId, secretAccessKey, publicUrl },
-} = config;
-
 // Initialize S3 client
 let s3Client: S3Client | null = null;
 
+/**
+ * Reset the S3 client (useful for testing)
+ */
+export function resetS3Client(): void {
+  s3Client = null;
+}
+
 export function getS3Client(): S3Client {
+  const { accessKeyId, secretAccessKey, region, endpoint } = config.s3;
+
   if (!accessKeyId || !secretAccessKey) {
     throw new Error(
       'S3 credentials are not fully configured. Please set S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY in your environment variables.',
@@ -33,14 +39,21 @@ export function getS3Client(): S3Client {
   }
 
   if (!s3Client) {
-    s3Client = new S3Client({
+    const clientConfig: S3ClientConfig = {
       region: region,
       endpoint: endpoint,
       credentials: {
         accessKeyId: accessKeyId,
         secretAccessKey: secretAccessKey,
       },
-    });
+    };
+
+    // Use path-style addressing for LocalStack and compatible services
+    if (endpoint && (endpoint.includes('localhost') || endpoint.includes('127.0.0.1'))) {
+      clientConfig.forcePathStyle = true;
+    }
+
+    s3Client = new S3Client(clientConfig);
   }
   return s3Client;
 }
@@ -54,7 +67,7 @@ export async function deleteDirectory(dirPrefix: string): Promise<void> {
   const client = getS3Client();
 
   if (config.verbose) {
-    console.log(`Deleting directory: s3://${bucketName}/${dirPrefix}`);
+    console.log(`Deleting directory: s3://${config.s3.bucketName}/${dirPrefix}`);
   }
 
   try {
@@ -64,7 +77,7 @@ export async function deleteDirectory(dirPrefix: string): Promise<void> {
     while (isTruncated) {
       // 1. List objects with the given prefix
       const listParams = {
-        Bucket: bucketName,
+        Bucket: config.s3.bucketName!,
         Prefix: dirPrefix,
         ContinuationToken: continuationToken,
       };
@@ -76,7 +89,7 @@ export async function deleteDirectory(dirPrefix: string): Promise<void> {
       if (objects && objects.length > 0) {
         // 2. Prepare objects for batch deletion
         const deleteParams = {
-          Bucket: bucketName,
+          Bucket: config.s3.bucketName!,
           Delete: {
             Objects: objects.map((object: _Object) => ({
               Key: object.Key as string,
@@ -115,7 +128,7 @@ export async function objectExists(key: string): Promise<boolean> {
   const client = getS3Client();
 
   try {
-    await client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
+    await client.send(new HeadObjectCommand({ Bucket: config.s3.bucketName!, Key: key }));
     return true;
   } catch (error) {
     const err = error as {
@@ -146,7 +159,7 @@ export async function listKeysWithPrefix(prefix: string): Promise<Set<string>> {
   do {
     const page = await client.send(
       new ListObjectsV2Command({
-        Bucket: bucketName,
+        Bucket: config.s3.bucketName!,
         Prefix: prefix,
         ContinuationToken: continuationToken,
       }),
@@ -230,8 +243,8 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
           client
             .send(
               new CopyObjectCommand({
-                Bucket: bucketName,
-                CopySource: `${bucketName}/${key}`,
+                Bucket: config.s3.bucketName!,
+                CopySource: `${config.s3.bucketName}/${key}`,
                 Key: endRoundKey,
               }),
             )
@@ -250,8 +263,8 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
           client
             .send(
               new CopyObjectCommand({
-                Bucket: bucketName,
-                CopySource: `${bucketName}/${key}`,
+                Bucket: config.s3.bucketName!,
+                CopySource: `${config.s3.bucketName}/${key}`,
                 Key: committeeIDKey,
               }),
             )
@@ -298,7 +311,7 @@ export async function syncDirectory(directoryPath: string) {
     }
   }
 
-  console.log(`Checking which objects already exist in bucket "${bucketName}"...`);
+  console.log(`Checking which objects already exist in bucket "${config.s3.bucketName}"...`);
   const existingKeys = new Set<string>();
 
   // List under each top-level prefix, in parallel.
@@ -330,7 +343,7 @@ export async function syncDirectory(directoryPath: string) {
     if (!existingKeys.has(key)) filesToUpload.push(filePath);
   }
 
-  console.log(`Uploading directory "${directoryPath}" to bucket "${bucketName}"...`);
+  console.log(`Uploading directory "${directoryPath}" to bucket "${config.s3.bucketName}"...`);
   console.log(
     `${filesToUpload.length} files to upload, ${files.length - filesToUpload.length} already in bucket`,
   );
@@ -349,7 +362,7 @@ export async function syncDirectory(directoryPath: string) {
 
       await client.send(
         new PutObjectCommand({
-          Bucket: bucketName,
+          Bucket: config.s3.bucketName!,
           Key: key,
           Body: body,
         }),
@@ -387,11 +400,11 @@ export async function syncDirectory(directoryPath: string) {
  * or undefined if not found. Throws on error.
  */
 export async function getMD5HashForObject(key: string): Promise<string | undefined> {
-  if (!publicUrl) {
+  if (!config.s3.publicUrl) {
     throw new Error('S3 public URL is not configured');
   }
 
-  const url = `${publicUrl.replace(/\/$/, '')}/${key}`;
+  const url = `${config.s3.publicUrl.replace(/\/$/, '')}/${key}`;
   const response = await fetch(url, { method: 'HEAD' });
   if (response.status === 404) {
     return undefined;
@@ -417,7 +430,7 @@ export async function getData(key: string): Promise<any> {
   try {
     const response = await client.send(
       new GetObjectCommand({
-        Bucket: bucketName,
+        Bucket: config.s3.bucketName!,
         Key: key,
       }),
     );
@@ -428,7 +441,7 @@ export async function getData(key: string): Promise<any> {
 
     return response.Body;
   } catch (error) {
-    console.error(`Error getting data from s3://${bucketName}/${key}:`, error);
+    console.error(`Error getting data from s3://${config.s3.bucketName}/${key}:`, error);
     throw error;
   }
 }
@@ -454,19 +467,19 @@ export async function uploadData(
 
     if (existingMD5 && existingMD5 === newMD5) {
       if (config.verbose) {
-        console.log(`Skipping upload for s3://${bucketName}/${key}, data is unchanged.`);
+        console.log(`Skipping upload for s3://${config.s3.bucketName}/${key}, data is unchanged.`);
       }
       return;
     }
   }
 
   if (config.verbose) {
-    console.log(`Uploading data to s3://${bucketName}/${key}...`);
+    console.log(`Uploading data to s3://${config.s3.bucketName}/${key}...`);
   }
 
   await client.send(
     new PutObjectCommand({
-      Bucket: bucketName,
+      Bucket: config.s3.bucketName!,
       Key: key,
       Body: data,
     }),
@@ -492,9 +505,9 @@ export function getKeyWithNetworkMetadata(keySuffix: string): string {
  * @returns {string} Public URL for the object
  */
 export function getPublicUrlForObject(keySuffix: string): string {
-  if (!publicUrl) {
+  if (!config.s3.publicUrl) {
     throw new Error('S3 public URL is not configured');
   }
 
-  return `${publicUrl.replace(/\/$/, '')}/${getKeyWithNetworkMetadata(keySuffix)}`;
+  return `${config.s3.publicUrl.replace(/\/$/, '')}/${getKeyWithNetworkMetadata(keySuffix)}`;
 }

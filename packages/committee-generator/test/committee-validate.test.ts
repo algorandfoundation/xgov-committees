@@ -47,8 +47,8 @@ describe('Committee validator', () => {
   });
 
   it('Should fail with out of order keys', () => {
-    let unsortedKeys = getCommitteeFixture();
-    // @ts-ignore
+    const unsortedKeys = getCommitteeFixture();
+    // @ts-expect-error - Deleting and re-adding to change property order
     delete unsortedKeys.registryId;
     unsortedKeys.registryId = getCommitteeFixture().registryId + 100;
     expect(() => validateCommitteeString(JSON.stringify(unsortedKeys))).toThrow(
@@ -99,7 +99,7 @@ describe('Committee validator', () => {
 
   it('Should fail without missing required keys', () => {
     const testCommittee = getCommitteeFixture();
-    // @ts-ignore
+    // @ts-expect-error - Intentionally deleting required property to test validation
     delete testCommittee.networkGenesisHash;
     expect(() => validateCommitteeString(JSON.stringify(testCommittee))).toThrow(
       `Committee JSON did not pass schema validation: must have required property 'networkGenesisHash'`,
