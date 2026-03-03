@@ -2,7 +2,6 @@ import {
   _Object,
   CopyObjectCommand,
   DeleteObjectsCommand,
-  GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -390,10 +389,6 @@ export async function syncDirectory(directoryPath: string) {
  * or undefined if not found. Throws on error.
  */
 export async function getMD5HashForObject(key: string): Promise<string | undefined> {
-  if (!publicUrl) {
-    throw new Error('S3 public URL is not configured');
-  }
-
   const url = `${publicUrl.replace(/\/$/, '')}/${key}`;
   const response = await fetch(url, { method: 'HEAD' });
   if (response.status === 404) {
@@ -407,33 +402,6 @@ export async function getMD5HashForObject(key: string): Promise<string | undefin
 
   // ETag is usually in quotes, remove them
   return etag.replace(/"/g, '');
-}
-
-/**
- * Get data from S3 for the specified key.
- * @param key full key path
- * @returns {Promise<any>} Resolves with the data from S3, or rejects if not found or on error
- */
-export async function getData(key: string): Promise<any> {
-  const client = getS3Client();
-
-  try {
-    const response = await client.send(
-      new GetObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-      }),
-    );
-
-    if (!response.Body) {
-      throw new Error(`No data found at key: ${key}`);
-    }
-
-    return response.Body;
-  } catch (error) {
-    console.error(`Error getting data from s3://${bucketName}/${key}:`, error);
-    throw error;
-  }
 }
 
 /**
@@ -495,9 +463,5 @@ export function getKeyWithNetworkMetadata(keySuffix: string): string {
  * @returns {string} Public URL for the object
  */
 export function getPublicUrlForObject(keySuffix: string): string {
-  if (!publicUrl) {
-    throw new Error('S3 public URL is not configured');
-  }
-
   return `${publicUrl.replace(/\/$/, '')}/${getKeyWithNetworkMetadata(keySuffix)}`;
 }
