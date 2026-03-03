@@ -171,10 +171,13 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
     console.log('Ensuring committee shortcuts exist in S3...');
   }
 
-  const keys = await listKeysWithPrefix(getKeyWithNetworkMetadata('committee/'));
+  // get full base key for committee data with network metadata prefix
+  const baseKey = getKeyWithNetworkMetadata(`committee/`);
+  // then list all keys under that prefix to find existing committees
+  const keys = await listKeysWithPrefix(baseKey);
 
   const copyTasks: Promise<void>[] = [];
-  const committeeMetadata: Array<{
+  const indexEntries: Array<{
     fromRound: number;
     toRound: number;
     committeeId: string;
@@ -198,7 +201,6 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
       const committeeID = getCommitteeID(committee);
       const safeCommitteeID = committeeIdToSafeFileName(committeeID);
 
-      const baseKey = getKeyWithNetworkMetadata(`committee/`);
       const endRoundKey = `${baseKey}${toRound}.json`;
       const committeeIDKey = `${baseKey}${safeCommitteeID}.json`;
 
@@ -208,7 +210,7 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
       ]);
 
       // Store metadata for index
-      committeeMetadata.push({
+      indexEntries.push({
         fromRound,
         toRound,
         committeeId: committeeID,
@@ -270,27 +272,25 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
   await Promise.all(copyTasks);
 
   // Create and upload index.json
-  if (committeeMetadata.length > 0) {
+  if (indexEntries.length > 0) {
     if (config.verbose) {
       console.log('Creating committee index file...');
     }
 
     // Sort by fromRound for easier navigation
-    committeeMetadata.sort((a, b) => a.fromRound - b.fromRound);
+    indexEntries.sort((a, b) => a.fromRound - b.fromRound);
 
     const indexData = {
-      committees: committeeMetadata,
+      committees: indexEntries,
       lastUpdated: new Date().toISOString(),
-      totalCommittees: committeeMetadata.length,
+      totalCommittees: indexEntries.length,
     };
 
     const indexKey = getKeyWithNetworkMetadata('committee/index.json');
     await uploadData(indexKey, JSON.stringify(indexData, null, 2));
 
     if (config.verbose) {
-      console.log(
-        `Created committee index with ${committeeMetadata.length} committees at ${indexKey}`,
-      );
+      console.log(`Created committee index with ${indexEntries.length} committees at ${indexKey}`);
     }
   }
 }
