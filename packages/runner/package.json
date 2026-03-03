@@ -1,5 +1,5 @@
 {
-  "name": "xgov-committee-runner",
+  "name": "xgov-committees-runner",
   "version": "1.0.0",
   "description": "Service runner for xGov automated committee generation",
   "type": "module",

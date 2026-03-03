@@ -15,7 +15,7 @@ const DEFAULT_CONFIG: Config = {
   algodPort: 443,
   algodToken: "",
   registryAppId: 3147789458,
-  stateDir: "/var/lib/xgov-committee-runner",
+  stateDir: "/var/lib/xgov-committees-runner",
 };
 
 export const config: Config = {

@@ -8,7 +8,7 @@ RUN apt-get update \
 # node:22-slim installs to /usr/local/bin/node; runner.service expects /usr/bin/node.
 RUN ln -sf /usr/local/bin/node /usr/bin/node
 
-RUN useradd --system --no-create-home xgov-committee-runner
+RUN useradd --system --no-create-home xgov-committees-runner
 
 WORKDIR /opt/xgov-committees/packages/runner
 # TODO: refactor to use the workspace root lock file instead.
@@ -28,7 +28,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 RUN npm run build
-RUN chown -R root:xgov-committee-runner /opt/xgov-committees \
+RUN chown -R root:xgov-committees-runner /opt/xgov-committees \
  && chmod -R u=rwX,g=rX,o= /opt/xgov-committees
 
 RUN cp systemd/runner.service /etc/systemd/system/ \
