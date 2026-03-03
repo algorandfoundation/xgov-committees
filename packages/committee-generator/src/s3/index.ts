@@ -162,33 +162,6 @@ export async function listKeysWithPrefix(prefix: string): Promise<Set<string>> {
 }
 
 /**
- * Generate shortcut keys for committee data based on the period end round and committee ID, to allow fetching committee data from S3 by these identifiers.
- * @param fromRound from round
- * @param toRound to round
- * @returns {Promise<[string, string]>} [shortcutKeyByRound, shortcutKeyByCommitteeID]
- * @throws if committee data is not found for the specified rounds
- */
-async function getShortcutKeysForPeriod(
-  fromRound: number,
-  toRound: number,
-): Promise<[string, string]> {
-  const committee = await loadCommittee(fromRound, toRound, 's3');
-
-  if (!committee) {
-    throw new Error(
-      `Committee data not found for rounds ${fromRound}-${toRound}, skipping shortcut creation`,
-    );
-  }
-
-  const committeeID = getCommitteeID(committee);
-  const safeCommitteeID = committeeIdToSafeFileName(committeeID);
-
-  const baseKey = getKeyWithNetworkMetadata(`committee/`);
-
-  return [`${baseKey}${toRound}.json`, `${baseKey}${safeCommitteeID}.json`];
-}
-
-/**
  * We must be able to serve committee data from S3 by the period end round, to facilitate this we just create a copy of the existing files
  */
 export async function ensureCommitteeShortcuts(): Promise<void> {
@@ -201,6 +174,11 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
   const keys = await listKeysWithPrefix(getKeyWithNetworkMetadata('committee/'));
 
   const copyTasks: Promise<void>[] = [];
+  const committeeMetadata: Array<{
+    fromRound: number;
+    toRound: number;
+    committeeId: string;
+  }> = [];
 
   for (const key of keys) {
     const match = key.match(/committee\/(\d+)-(\d+)\.json$/);
@@ -210,11 +188,31 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
     const [fromRound, toRound] = [parseInt(match[1], 10), parseInt(match[2], 10)];
 
     try {
-      const [endRoundKey, committeeIDKey] = await getShortcutKeysForPeriod(fromRound, toRound);
+      const committee = await loadCommittee(fromRound, toRound, 's3');
+
+      if (!committee) {
+        console.error(`Committee data not found for rounds ${fromRound}-${toRound}, skipping...`);
+        continue;
+      }
+
+      const committeeID = getCommitteeID(committee);
+      const safeCommitteeID = committeeIdToSafeFileName(committeeID);
+
+      const baseKey = getKeyWithNetworkMetadata(`committee/`);
+      const endRoundKey = `${baseKey}${toRound}.json`;
+      const committeeIDKey = `${baseKey}${safeCommitteeID}.json`;
+
       const [endRoundExists, committeeIDExists] = await Promise.all([
         objectExists(endRoundKey),
         objectExists(committeeIDKey),
       ]);
+
+      // Store metadata for index
+      committeeMetadata.push({
+        fromRound,
+        toRound,
+        committeeId: committeeID,
+      });
 
       if (endRoundExists && committeeIDExists) {
         if (config.verbose) {
@@ -270,6 +268,31 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
   }
 
   await Promise.all(copyTasks);
+
+  // Create and upload index.json
+  if (committeeMetadata.length > 0) {
+    if (config.verbose) {
+      console.log('Creating committee index file...');
+    }
+
+    // Sort by fromRound for easier navigation
+    committeeMetadata.sort((a, b) => a.fromRound - b.fromRound);
+
+    const indexData = {
+      committees: committeeMetadata,
+      lastUpdated: new Date().toISOString(),
+      totalCommittees: committeeMetadata.length,
+    };
+
+    const indexKey = getKeyWithNetworkMetadata('committee/index.json');
+    await uploadData(indexKey, JSON.stringify(indexData, null, 2));
+
+    if (config.verbose) {
+      console.log(
+        `Created committee index with ${committeeMetadata.length} committees at ${indexKey}`,
+      );
+    }
+  }
 }
 
 export async function syncDirectory(directoryPath: string) {
