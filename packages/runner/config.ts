@@ -8,6 +8,7 @@ export interface Config {
   algodToken: string;
   registryAppId: number;
   stateDir: string;
+  committeeGeneratorPath: string;
 }
 
 const DEFAULT_CONFIG: Config = {
@@ -16,6 +17,7 @@ const DEFAULT_CONFIG: Config = {
   algodToken: "",
   registryAppId: 3147789458,
   stateDir: "/var/lib/xgov-committees-runner",
+  committeeGeneratorPath: "/opt/xgov-committees/packages/committee-generator/dist/index.js",
 };
 
 export const config: Config = {
@@ -24,4 +26,5 @@ export const config: Config = {
   algodToken: process.env.ALGOD_TOKEN ?? DEFAULT_CONFIG.algodToken,
   registryAppId: process.env.REGISTRY_APP_ID ? parseInt(process.env.REGISTRY_APP_ID, 10) : DEFAULT_CONFIG.registryAppId,
   stateDir: process.env.STATE_DIR ?? DEFAULT_CONFIG.stateDir,
+  committeeGeneratorPath: process.env.COMMITTEE_GENERATOR_PATH ?? DEFAULT_CONFIG.committeeGeneratorPath,
 };
