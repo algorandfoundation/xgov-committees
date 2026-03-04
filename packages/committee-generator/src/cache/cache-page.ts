@@ -1,9 +1,9 @@
 import { readFile, writeFile } from 'fs/promises';
 import { hashBuffer } from './utils';
-import { fsExists } from '../utils';
+import { fsExists, getMD5Hash } from '../utils';
 import { config } from '../config';
 import { basename } from 'path';
-import { getKeyWithNetworkMetadata, uploadData } from '../s3';
+import { getKeyWithNetworkMetadata, uploadData, getMD5HashForObject } from '../s3';
 import { CachePagePayload, fetchPageFromS3 } from './s3-cache';
 
 export const CACHE_PAGE_SIZE = 1_000;
@@ -25,21 +25,69 @@ export class CachePage {
   }
 
   /**
-   * Fetches the page data from S3 and creates a CachePage instance after saving to disk.
+   * Loads the page using a local-first approach with S3 validation.
+   * First checks if the page exists locally and validates its MD5 against S3.
+   * If local page is valid, uses it; otherwise fetches from S3 and saves to disk. If not found in S3, returns an empty page (that will be populated from scratch).
    * @param pageStart - Start round of the required page
-   * @param filename - The local filename to save the page data to
-   * @returns {Promise<CachePage>} A promise that resolves to a CachePage instance with the fetched data
-   * @throws Will throw an error if the page is not found in S3 or if the fetch/save process fails.
+   * @param filename - The local filename to cache the page data
+   * @returns {Promise<CachePage>} A promise that resolves to a CachePage instance
+   * @throws May throw an error if S3 validation, fetch, or local file read/write operations fail.
    */
   static async loadPageFromS3(pageStart: number, filename: string): Promise<CachePage> {
-    // load page from S3
+    // Check if local file exists
+    if (await fsExists(filename)) {
+      try {
+        if (config.verbose) {
+          console.debug(`Validating local page ${pageStart} against S3...`);
+        }
+
+        // First check if S3 object exists with MD5 - if not, skip validation
+        const s3Hash = await getMD5HashForObject(
+          getKeyWithNetworkMetadata(`blocks/${basename(filename)}`),
+        );
+
+        if (s3Hash !== undefined) {
+          // S3 object exists, now read local file and compare
+          const localContents = await readFile(filename);
+          const localHash = getMD5Hash(localContents);
+
+          if (localHash === s3Hash) {
+            if (config.verbose) {
+              console.debug(`Using cached page ${pageStart}, MD5 validated against S3`);
+            }
+            return new CachePage({ filename, contents: localContents });
+          } else {
+            if (config.verbose) {
+              console.debug(
+                `Local cache for page ${pageStart} is stale (MD5 mismatch with S3); will refetch from S3.`,
+              );
+            }
+          }
+        }
+      } catch (error) {
+        if (config.verbose) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`Failed to compare local cache with S3 for ${filename}: ${message}.`);
+        }
+      }
+    }
+
+    if (config.verbose) {
+      console.debug(`Fetching page ${pageStart} from S3...`);
+    }
+
     const data = await fetchPageFromS3(pageStart);
-    // convert format
-    const contents = Buffer.from(JSON.stringify(data));
-    // Save to disk for local caching
-    await writeFile(filename, contents);
-    // load as normal
-    return new CachePage({ filename, contents });
+    if (data !== undefined) {
+      const contents = Buffer.from(JSON.stringify(data));
+      await writeFile(filename, contents);
+      return new CachePage({ filename, contents });
+    }
+
+    if (config.verbose) {
+      console.debug(`Page ${pageStart} not found in local cache or S3, starting with empty page.`);
+    }
+
+    return new CachePage({ filename });
   }
 
   static async loadPage(filename: string) {
