@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "bash test/unit/run-unit.sh",
-    "test:integration": "vitest run test/integration"
+    "test:integration": "vitest run test/integration",
+    "test:smoke": "vitest run test/smoke"
   },
   "dependencies": {
     "@algorandfoundation/algokit-utils": "^9.2.0",
