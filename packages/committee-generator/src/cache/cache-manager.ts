@@ -3,7 +3,6 @@ import { CACHE_MAX_PAGES, CACHE_PAGE_SIZE, CachePage } from './cache-page';
 import { getCachePath } from './utils';
 import { fsExists, sleep } from '../utils';
 import { config } from '../config';
-import { fetchPageFromS3 } from './s3-cache';
 
 export function getPageStartRnd(rnd: number) {
   return Math.floor(rnd / CACHE_PAGE_SIZE) * CACHE_PAGE_SIZE;
@@ -79,18 +78,12 @@ export class CacheManager {
             await this.evictPage();
           }
 
+          const filename = this.getBlockCacheFilePath(pageStart);
           let page: CachePage;
 
-          // In use-cache mode, fetch from S3 and create read-only page
           if (this.useS3) {
-            const s3Data = await fetchPageFromS3(pageStart);
-            if (!s3Data) {
-              throw new Error(`Page ${pageStart} not found in S3 cache`);
-            }
-            page = CachePage.fromS3Data(pageStart, s3Data);
+            page = await CachePage.loadPageFromS3(pageStart, filename);
           } else {
-            // For other modes, load from filesystem
-            const filename = this.getBlockCacheFilePath(pageStart);
             page = await CachePage.loadPage(filename);
           }
 

@@ -5,6 +5,7 @@ import { join } from 'path';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
+import { BinaryLike, createHash } from 'crypto';
 
 export async function fsExists(path: string) {
   try {
@@ -97,4 +98,13 @@ export async function downloadToFile(url: string, filename: string): Promise<voi
   const nodeStream = Readable.fromWeb(response.body as any);
 
   await pipeline(nodeStream, fileStream);
+}
+
+/**
+ *
+ * @param buffer - The input data to hash, as a string or Buffer
+ * @returns A hex string representing the MD5 hash of the input buffer
+ */
+export function getMD5Hash(buffer: BinaryLike): string {
+  return createHash('md5').update(buffer).digest('hex');
 }
