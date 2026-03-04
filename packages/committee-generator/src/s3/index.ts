@@ -420,14 +420,20 @@ export async function uploadData(
   const client = getS3Client();
 
   if (!force) {
-    const existingMD5 = await getMD5HashForObject(key);
-    const newMD5 = getMD5Hash(data);
+    try {
+      const existingMD5 = await getMD5HashForObject(key);
+      const newMD5 = getMD5Hash(data);
 
-    if (existingMD5 && existingMD5 === newMD5) {
-      if (config.verbose) {
-        console.log(`Skipping upload for s3://${bucketName}/${key}, data is unchanged.`);
+      if (existingMD5 && existingMD5 === newMD5) {
+        if (config.verbose) {
+          console.log(`Skipping upload for s3://${bucketName}/${key}, data is unchanged.`);
+        }
+        return;
       }
-      return;
+    } catch (error) {
+      // Log the error but proceed with the upload, as the MD5 check is an optimization, not a requirement.
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(`Failed to get existing MD5 for s3://${bucketName}/${key}: ${errorMessage}`);
     }
   }
 
