@@ -1,14 +1,13 @@
 import { readFile, writeFile } from 'fs/promises';
 import { hashBuffer } from './utils';
-import { fsExists } from '../utils';
+import { fsExists, getMD5Hash } from '../utils';
 import { config } from '../config';
 import { basename } from 'path';
-import { getKeyWithNetworkMetadata, uploadData } from '../s3';
+import { getKeyWithNetworkMetadata, uploadData, getMD5HashForObject } from '../s3';
+import { CachePagePayload, fetchPageFromS3 } from './s3-cache';
 
 export const CACHE_PAGE_SIZE = 1_000;
 export const CACHE_MAX_PAGES = 10;
-
-type CachePagePayload = Record<string, string>;
 
 export class CachePage {
   filename: string;
@@ -17,35 +16,78 @@ export class CachePage {
   dirty = false;
   lastAccess: number;
   pending = new Set<Promise<any>>();
-  readonly readOnly: boolean;
 
-  constructor({
-    filename,
-    contents,
-    readOnly = false,
-  }: {
-    filename: string;
-    contents?: Buffer;
-    readOnly?: boolean;
-  }) {
+  constructor({ filename, contents }: { filename: string; contents?: Buffer }) {
     this.filename = filename;
     this.diskHash = contents ? hashBuffer(contents) : undefined;
     this.data = contents ? JSON.parse(contents.toString()) : {};
     this.lastAccess = Date.now();
-    this.readOnly = readOnly;
   }
 
   /**
-   * Creates a read-only CachePage from S3 data.
-   * This page will never be saved to disk or marked as dirty.
+   * Loads the page using a local-first approach with S3 validation.
+   * First checks if the page exists locally and validates its MD5 against S3.
+   * If local page is valid, uses it; otherwise fetches from S3 and saves to disk. If not found in S3, returns an empty page (that will be populated from scratch).
+   * @param pageStart - Start round of the required page
+   * @param filename - The local filename to cache the page data
+   * @returns {Promise<CachePage>} A promise that resolves to a CachePage instance
+   * @throws May throw an error if S3 validation, fetch, or local file read/write operations fail.
    */
-  static fromS3Data(pageStart: number, data: CachePagePayload): CachePage {
-    const page = new CachePage({
-      filename: `S3:${pageStart}`, // Virtual filename for debugging
-      readOnly: true,
-    });
-    page.data = data;
-    return page;
+  static async loadPageFromS3(pageStart: number, filename: string): Promise<CachePage> {
+    // Check if local file exists
+    if (await fsExists(filename)) {
+      try {
+        if (config.verbose) {
+          console.debug(`Validating local page ${pageStart} against S3...`);
+        }
+
+        // First check if S3 object exists with MD5 - if not, skip validation
+        const s3Hash = await getMD5HashForObject(
+          getKeyWithNetworkMetadata(`blocks/${basename(filename)}`),
+        );
+
+        if (s3Hash !== undefined) {
+          // S3 object exists, now read local file and compare
+          const localContents = await readFile(filename);
+          const localHash = getMD5Hash(localContents);
+
+          if (localHash === s3Hash) {
+            if (config.verbose) {
+              console.debug(`Using cached page ${pageStart}, MD5 validated against S3`);
+            }
+            return new CachePage({ filename, contents: localContents });
+          } else {
+            if (config.verbose) {
+              console.debug(
+                `Local cache for page ${pageStart} is stale (MD5 mismatch with S3); will refetch from S3.`,
+              );
+            }
+          }
+        }
+      } catch (error) {
+        if (config.verbose) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`Failed to compare local cache with S3 for ${filename}: ${message}.`);
+        }
+      }
+    }
+
+    if (config.verbose) {
+      console.debug(`Fetching page ${pageStart} from S3...`);
+    }
+
+    const data = await fetchPageFromS3(pageStart);
+    if (data !== undefined) {
+      const contents = Buffer.from(JSON.stringify(data));
+      await writeFile(filename, contents);
+      return new CachePage({ filename, contents });
+    }
+
+    if (config.verbose) {
+      console.debug(`Page ${pageStart} not found in local cache or S3, starting with empty page.`);
+    }
+
+    return new CachePage({ filename });
   }
 
   static async loadPage(filename: string) {
@@ -87,8 +129,8 @@ export class CachePage {
     this.diskHash = hashBuffer(contents);
     this.pending.delete(promise);
 
-    // we have a complete file on disk at this point, so we can safely upload to S3 if needed
-    if (!this.dirty) {
+    // we have a complete file on disk at this point, so we can safely upload to S3 if needed in 'write-cache' mode
+    if (!this.dirty && config.cacheMode === 'write-cache') {
       await uploadData(getKeyWithNetworkMetadata(`blocks/${basename(this.filename)}`), contents);
     }
 
@@ -98,11 +140,6 @@ export class CachePage {
   }
 
   async evict() {
-    // Skip eviction for read-only pages (from S3) - nothing to save
-    if (this.readOnly) {
-      return;
-    }
-
     // set() and savePage() races can lead to dirty-after-write
     while (this.dirty) {
       await this.savePage();
