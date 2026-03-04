@@ -1,11 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WATCHDOG_INTERVAL_MS } from "../../watchdog.ts";
+import { WATCHDOG_INTERVAL_MS } from "../../src/watchdog.ts";
 
 // vi.mock is hoisted before imports, so watchdog.ts gets the mocked spawnSync.
 vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
 
-import { notifySystemd, startWatchdog } from "../../watchdog.ts";
+import { notifySystemd, startWatchdog } from "../../src/watchdog.ts";
 
 describe("watchdog", () => {
   const mockSpawnSync = vi.mocked(spawnSync);

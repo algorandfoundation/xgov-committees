@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { saveState } from "../../state.ts";
+import { saveState } from "../../src/state.ts";
 
 // Mainnet genesis hash — must match what the runner computes from algod params.
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
@@ -54,7 +54,7 @@ describe("runner smoke test", () => {
 
   it("starts and exits 0 with expected output", () => {
     // Spawns the runner as a subprocess and verifies it boots, prints the expected startup banner, and exits cleanly.
-    const result = spawnSync("node", ["--import", "tsx/esm", "index.ts"], {
+    const result = spawnSync("node", ["--import", "tsx/esm", "src/index.ts"], {
       cwd: join(import.meta.dirname, "../.."),
       encoding: "utf8",
       env: baseEnv(),
@@ -67,7 +67,7 @@ describe("runner smoke test", () => {
   it("respects env overrides in the startup banner", () => {
     // Verifies that environment variables override default config values in the startup banner.
     // Note: run() will fail (fake algod server), so we only assert on stdout, not exit code.
-    const result = spawnSync("node", ["--import", "tsx/esm", "index.ts"], {
+    const result = spawnSync("node", ["--import", "tsx/esm", "src/index.ts"], {
       cwd: join(import.meta.dirname, "../.."),
       encoding: "utf8",
       env: {
@@ -88,7 +88,7 @@ describe("runner smoke test", () => {
       updatedAt: new Date().toISOString(),
     });
 
-    const result = spawnSync("node", ["--import", "tsx/esm", "index.ts"], {
+    const result = spawnSync("node", ["--import", "tsx/esm", "src/index.ts"], {
       cwd: join(import.meta.dirname, "../.."),
       encoding: "utf8",
       env: baseEnv(),

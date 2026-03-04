@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_TOLERANCE_FOR_1M, closeTo1MBoundary, crossed100KBoundary, next1MBoundary } from "../../utils.ts";
+import { BLOCK_TOLERANCE_FOR_1M, closeTo1MBoundary, crossed100KBoundary, next1MBoundary } from "../../src/utils.ts";
 
 describe("crossed100KBoundary", () => {
   it.each([
