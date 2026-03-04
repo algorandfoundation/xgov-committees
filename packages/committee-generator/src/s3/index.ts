@@ -2,7 +2,6 @@ import {
   _Object,
   CopyObjectCommand,
   DeleteObjectsCommand,
-  GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -14,7 +13,7 @@ import { createReadStream } from 'fs';
 import { stat as fsStat } from 'fs/promises';
 import pMap from 'p-map';
 import { formatBytes } from '../cache/utils';
-import { committeeIdToSafeFileName, walkDir } from '../utils';
+import { committeeIdToSafeFileName, getMD5Hash, walkDir } from '../utils';
 import { relative } from 'path';
 import { getCommitteeID, loadCommittee } from '../committee';
 
@@ -162,33 +161,6 @@ export async function listKeysWithPrefix(prefix: string): Promise<Set<string>> {
 }
 
 /**
- * Generate shortcut keys for committee data based on the period end round and committee ID, to allow fetching committee data from S3 by these identifiers.
- * @param fromRound from round
- * @param toRound to round
- * @returns {Promise<[string, string]>} [shortcutKeyByRound, shortcutKeyByCommitteeID]
- * @throws if committee data is not found for the specified rounds
- */
-async function getShortcutKeysForPeriod(
-  fromRound: number,
-  toRound: number,
-): Promise<[string, string]> {
-  const committee = await loadCommittee(fromRound, toRound, 's3');
-
-  if (!committee) {
-    throw new Error(
-      `Committee data not found for rounds ${fromRound}-${toRound}, skipping shortcut creation`,
-    );
-  }
-
-  const committeeID = getCommitteeID(committee);
-  const safeCommitteeID = committeeIdToSafeFileName(committeeID);
-
-  const baseKey = getKeyWithNetworkMetadata(`committee/`);
-
-  return [`${baseKey}${toRound}.json`, `${baseKey}${safeCommitteeID}.json`];
-}
-
-/**
  * We must be able to serve committee data from S3 by the period end round, to facilitate this we just create a copy of the existing files
  */
 export async function ensureCommitteeShortcuts(): Promise<void> {
@@ -198,9 +170,17 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
     console.log('Ensuring committee shortcuts exist in S3...');
   }
 
-  const keys = await listKeysWithPrefix(getKeyWithNetworkMetadata('committee/'));
+  // get full base key for committee data with network metadata prefix
+  const baseKey = getKeyWithNetworkMetadata(`committee/`);
+  // then list all keys under that prefix to find existing committees
+  const keys = await listKeysWithPrefix(baseKey);
 
   const copyTasks: Promise<void>[] = [];
+  const indexEntries: Array<{
+    fromRound: number;
+    toRound: number;
+    committeeId: string;
+  }> = [];
 
   for (const key of keys) {
     const match = key.match(/committee\/(\d+)-(\d+)\.json$/);
@@ -210,11 +190,30 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
     const [fromRound, toRound] = [parseInt(match[1], 10), parseInt(match[2], 10)];
 
     try {
-      const [endRoundKey, committeeIDKey] = await getShortcutKeysForPeriod(fromRound, toRound);
+      const committee = await loadCommittee(fromRound, toRound, 's3');
+
+      if (!committee) {
+        console.error(`Committee data not found for rounds ${fromRound}-${toRound}, skipping...`);
+        continue;
+      }
+
+      const committeeID = getCommitteeID(committee);
+      const safeCommitteeID = committeeIdToSafeFileName(committeeID);
+
+      const endRoundKey = `${baseKey}${toRound}.json`;
+      const committeeIDKey = `${baseKey}${safeCommitteeID}.json`;
+
       const [endRoundExists, committeeIDExists] = await Promise.all([
         objectExists(endRoundKey),
         objectExists(committeeIDKey),
       ]);
+
+      // Store metadata for index
+      indexEntries.push({
+        fromRound,
+        toRound,
+        committeeId: committeeID,
+      });
 
       if (endRoundExists && committeeIDExists) {
         if (config.verbose) {
@@ -270,6 +269,29 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
   }
 
   await Promise.all(copyTasks);
+
+  // Create and upload index.json
+  if (indexEntries.length > 0) {
+    if (config.verbose) {
+      console.log('Creating committee index file...');
+    }
+
+    // Sort by fromRound for easier navigation
+    indexEntries.sort((a, b) => a.fromRound - b.fromRound);
+
+    const indexData = {
+      committees: indexEntries,
+      lastUpdated: new Date().toISOString(),
+      totalCommittees: indexEntries.length,
+    };
+
+    const indexKey = getKeyWithNetworkMetadata('committee/index.json');
+    await uploadData(indexKey, JSON.stringify(indexData, null, 2));
+
+    if (config.verbose) {
+      console.log(`Created committee index with ${indexEntries.length} committees at ${indexKey}`);
+    }
+  }
 }
 
 export async function syncDirectory(directoryPath: string) {
@@ -387,10 +409,6 @@ export async function syncDirectory(directoryPath: string) {
  * or undefined if not found. Throws on error.
  */
 export async function getMD5HashForObject(key: string): Promise<string | undefined> {
-  if (!publicUrl) {
-    throw new Error('S3 public URL is not configured');
-  }
-
   const url = `${publicUrl.replace(/\/$/, '')}/${key}`;
   const response = await fetch(url, { method: 'HEAD' });
   if (response.status === 404) {
@@ -407,40 +425,37 @@ export async function getMD5HashForObject(key: string): Promise<string | undefin
 }
 
 /**
- * Get data from S3 for the specified key.
- * @param key full key path
- * @returns {Promise<any>} Resolves with the data from S3, or rejects if not found or on error
- */
-export async function getData(key: string): Promise<any> {
-  const client = getS3Client();
-
-  try {
-    const response = await client.send(
-      new GetObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-      }),
-    );
-
-    if (!response.Body) {
-      throw new Error(`No data found at key: ${key}`);
-    }
-
-    return response.Body;
-  } catch (error) {
-    console.error(`Error getting data from s3://${bucketName}/${key}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Upload data to S3 under the specified key.
+ * Upload data to S3 under the specified key. If it already exists and the MD5 matches, the upload is skipped.
  * @param key S3 key to upload under
  * @param data string or buffer data to upload
+ * @param force if true, forces upload even if the object already exists (default: false)
+ * @throws Will throw an error if the upload fails
  * @returns {Promise<void>} Resolves when upload is complete
  */
-export async function uploadData(key: string, data: string | Uint8Array | Buffer): Promise<void> {
+export async function uploadData(
+  key: string,
+  data: string | Uint8Array | Buffer,
+  force: boolean = false,
+): Promise<void> {
   const client = getS3Client();
+
+  if (!force) {
+    try {
+      const existingMD5 = await getMD5HashForObject(key);
+      const newMD5 = getMD5Hash(data);
+
+      if (existingMD5 && existingMD5 === newMD5) {
+        if (config.verbose) {
+          console.log(`Skipping upload for s3://${bucketName}/${key}, data is unchanged.`);
+        }
+        return;
+      }
+    } catch (error) {
+      // Log the error but proceed with the upload, as the MD5 check is an optimization, not a requirement.
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(`Failed to get existing MD5 for s3://${bucketName}/${key}: ${errorMessage}`);
+    }
+  }
 
   if (config.verbose) {
     console.log(`Uploading data to s3://${bucketName}/${key}...`);
@@ -474,9 +489,5 @@ export function getKeyWithNetworkMetadata(keySuffix: string): string {
  * @returns {string} Public URL for the object
  */
 export function getPublicUrlForObject(keySuffix: string): string {
-  if (!publicUrl) {
-    throw new Error('S3 public URL is not configured');
-  }
-
   return `${publicUrl.replace(/\/$/, '')}/${getKeyWithNetworkMetadata(keySuffix)}`;
 }
