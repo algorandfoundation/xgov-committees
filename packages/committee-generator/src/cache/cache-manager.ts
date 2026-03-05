@@ -149,18 +149,17 @@ export const cacheManager = new CacheManager(
   config.cacheMode === 'write-cache', // useS3 only in write-cache mode
 );
 
-for (const sig of ['SIGTERM', 'SIGINT', 'uncaughtException', 'unhandledRejection', 'beforeExit']) {
-  process.on(sig, gracefulExit);
-  async function gracefulExit() {
-    if (cacheManager.hasDirty()) {
-      console.log('\nFlushing data to disk before exit');
-      try {
-        await cacheManager.evictAllPages();
-        console.log('OK');
-      } catch (e) {
-        console.error('While shutting down:', e);
-      }
+/**
+ * Gracefully shutdown cache manager by flushing all dirty pages to disk (and s3)
+ */
+export async function shutdownCache() {
+  if (cacheManager.hasDirty()) {
+    console.log('\nFlushing data to disk before exit');
+    try {
+      await cacheManager.evictAllPages();
+      console.log('OK');
+    } catch (e) {
+      console.error('While shutting down cache:', e);
     }
-    process.exit(0);
   }
 }
