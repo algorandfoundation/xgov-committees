@@ -144,15 +144,20 @@ describe("runner smoke test", () => {
     });
 
     // Poll until the generator writes its PID (confirms it is running).
-    const childPid = await new Promise<number>((resolve) => {
+    const childPid = await new Promise<number>((resolve, reject) => {
       const poll = setInterval(() => {
         try {
           resolve(parseInt(readFileSync(pidFile, "utf8")));
           clearInterval(poll);
+          clearTimeout(timeout);
         } catch {
           /* not yet */
         }
       }, 50);
+      const timeout = setTimeout(() => {
+        clearInterval(poll);
+        reject(new Error("timed out waiting for generator PID file"));
+      }, 10_000);
     });
 
     runner.kill("SIGTERM");
