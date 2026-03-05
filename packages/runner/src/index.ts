@@ -2,7 +2,7 @@ import { config } from "./config.ts";
 import { notifySystemd, startWatchdog } from "./watchdog.ts";
 import { run, getActiveChild } from "./service.ts";
 
-console.log("xgox-committees-runner starting...");
+console.log("xgov-committees-runner starting...");
 console.log(`  algod:      ${config.algodServer}:${config.algodPort}`);
 console.log(`  registry:   ${config.registryAppId}`);
 console.log("Runner started successfully.");
