@@ -21,7 +21,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('uncaughtException', fatalError);
 process.on('unhandledRejection', fatalError);
 
-// beforeExit intentionally ommitted
+// beforeExit intentionally omitted
 
 await ensureCacheSubPathExists('blocks');
 
