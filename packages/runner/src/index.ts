@@ -43,13 +43,13 @@ async function shutdown(reason: string, exitCode: number): Promise<never> {
   process.exit(exitCode);
 }
 
-process.on("SIGTERM", () => {
-  shutdown("SIGTERM", 0);
-});
-
 notifySystemd("READY=1");
 const watchdogHandle = startWatchdog((err) => {
   shutdown(`watchdog failure: ${err.message}`, 1);
+});
+
+process.on("SIGTERM", () => {
+  shutdown("SIGTERM", 0);
 });
 
 try {
