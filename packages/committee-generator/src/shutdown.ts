@@ -7,23 +7,33 @@ export const ExitCode = {
 } as const;
 
 let shuttingDown = false;
+let shutdownPromise: Promise<never> | null = null;
 
 type ShutdownReason = 'signal' | 'expected' | 'fatal';
 
 export async function shutdown(exitCode: number, reason: ShutdownReason, message?: string) {
+  if (shutdownPromise) {
+    return shutdownPromise;
+  }
+
   if (!shuttingDown) {
     shuttingDown = true;
 
-    console.log(`Shutdown (${reason})`, message ?? '');
+    shutdownPromise = (async () => {
+      console.log(`Shutdown (${reason})`, message ?? '');
 
-    try {
-      await shutdownCache();
-    } catch (err) {
-      console.error('Cleanup failed:', err);
-    }
+      try {
+        await shutdownCache();
+      } catch (err) {
+        console.error('Cleanup failed:', err);
+      }
 
-    process.exit(exitCode);
+      // This will terminate the process; the Promise will never resolve.
+      process.exit(exitCode);
+    })();
   }
+
+  return shutdownPromise;
 }
 
 export async function gracefulShutdown(signal: string) {
