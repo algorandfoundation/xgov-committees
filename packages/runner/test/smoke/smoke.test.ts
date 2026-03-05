@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, chmodSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -95,5 +95,73 @@ describe("runner smoke test", () => {
     });
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("100K boundary crossed");
+  });
+
+  it("exits 0 when committee-generator reaches chain tip (exit code 10)", () => {
+    const tipGenerator = join(fakeBinDir, "tip-generator.js");
+    writeFileSync(tipGenerator, "process.exit(10);\n");
+
+    saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
+      lastProcessedRound: 0,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const result = spawnSync("node", ["--import", "tsx/esm", "src/index.ts"], {
+      cwd: join(import.meta.dirname, "../.."),
+      encoding: "utf8",
+      env: {
+        ...baseEnv(),
+        COMMITTEE_GENERATOR_PATH: tipGenerator,
+      },
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+  });
+
+  it("exits 0 on SIGTERM while generator is running and does not orphan child", { timeout: 30_000 }, async () => {
+    const pidFile = join(stateDir, "generator.pid");
+    const slowGenerator = join(fakeBinDir, "slow-generator.mjs");
+    // Writes its PID to PID_FILE (passed via env) then hangs so SIGTERM arrives mid-run.
+    // Uses .mjs so Node.js treats it as ESM regardless of the temp dir having no package.json.
+    writeFileSync(
+      slowGenerator,
+      `import { writeFileSync } from "node:fs";\nwriteFileSync(process.env.PID_FILE, String(process.pid));\nsetTimeout(() => process.exit(0), 60_000);\n`,
+    );
+
+    saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
+      lastProcessedRound: 0,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const runner = spawn("node", ["--import", "tsx/esm", "src/index.ts"], {
+      cwd: join(import.meta.dirname, "../.."),
+      env: {
+        ...baseEnv(),
+        COMMITTEE_GENERATOR_PATH: slowGenerator,
+        PID_FILE: pidFile,
+      },
+    });
+
+    // Poll until the generator writes its PID (confirms it is running).
+    const childPid = await new Promise<number>((resolve) => {
+      const poll = setInterval(() => {
+        try {
+          resolve(parseInt(readFileSync(pidFile, "utf8")));
+          clearInterval(poll);
+        } catch {
+          /* not yet */
+        }
+      }, 50);
+    });
+
+    runner.kill("SIGTERM");
+
+    const exitCode = await new Promise<number | null>((resolve) => {
+      runner.on("close", (code) => resolve(code));
+    });
+
+    expect(exitCode).toBe(0);
+    expect(() => process.kill(childPid, 0)).toThrow(); // child was killed, not orphaned
   });
 });

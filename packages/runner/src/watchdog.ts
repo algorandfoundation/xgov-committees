@@ -15,6 +15,15 @@ export function notifySystemd(msg: string): void {
   }
 }
 
-export function startWatchdog(): NodeJS.Timeout {
-  return setInterval(() => notifySystemd("WATCHDOG=1"), WATCHDOG_INTERVAL_MS);
+export function startWatchdog(onFailure: (err: Error) => unknown): NodeJS.Timeout {
+  let failed = false;
+  return setInterval(() => {
+    if (failed) return;
+    try {
+      notifySystemd("WATCHDOG=1");
+    } catch (err) {
+      failed = true;
+      onFailure(err instanceof Error ? err : new Error(String(err)));
+    }
+  }, WATCHDOG_INTERVAL_MS);
 }
