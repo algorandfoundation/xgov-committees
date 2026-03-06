@@ -21,8 +21,8 @@ export function getActiveChild(): ChildProcess | null {
 }
 
 /**
- * Spawns the committee generator in write-cache mode for blocks [fromBlock, toBlock].
- * Resolves "success" (exit 0) or "tip" (exit 10, chain tip reached before toBlock).
+ * Spawns the committee generator in write-cache mode for [fromBlock, toBlock].
+ * Resolves "success" or "tip" (generator hit the chain tip before toBlock).
  * Rejects on fatal exit or spawn error.
  * TODO: verify inclusive/exclusive block range with generator.
  */
@@ -55,8 +55,8 @@ function spawnWriteCache(generatorPath: string, fromBlock: number, toBlock: numb
 }
 
 /**
- * Waits until the chain reaches `round` by calling statusAfterBlock in a loop.
- * This is necessary since statusAfterBlock has a 1-minute timeout.
+ * Polls algod until the chain reaches targetRound.
+ * Necessary because the statusAfterBlock times out after 1 minute.
  */
 export async function waitForBlock(algorand: AlgorandClient, targetRound: number): Promise<void> {
   while (true) {
@@ -66,9 +66,9 @@ export async function waitForBlock(algorand: AlgorandClient, targetRound: number
 }
 
 /**
- * Runs spawnWriteCache, transparently retrying once if the generator signals it reached the chain tip.
- * On tip, waits for the chain to advance ROUND_BUFFER blocks, then retries with the same range.
- * Throws if the generator reaches tip twice, or on any fatal/unexpected exit.
+ * Runs write-cache for [from, to], retrying once if the generator hits the chain tip.
+ * On tip, waits for block `to + ROUND_BUFFER` before retrying with the same range.
+ * Throws if tip is hit twice.
  */
 async function runWriteCache(algorand: AlgorandClient, generatorPath: string, from: number, to: number): Promise<void> {
   const result = await spawnWriteCache(generatorPath, from, to);
