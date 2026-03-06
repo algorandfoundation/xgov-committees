@@ -55,6 +55,17 @@ function spawnWriteCache(generatorPath: string, fromBlock: number, toBlock: numb
 }
 
 /**
+ * Waits until the chain reaches `round` by calling statusAfterBlock in a loop.
+ * This is necessary since statusAfterBlock has a 1-minute timeout.
+ */
+export async function waitForBlock(algorand: AlgorandClient, targetRound: number): Promise<void> {
+  while (true) {
+    const status = await algorand.client.algod.statusAfterBlock(targetRound - 1).do();
+    if (Number(status.lastRound) >= targetRound) return;
+  }
+}
+
+/**
  * Runs spawnWriteCache, transparently retrying once if the generator signals it reached the chain tip.
  * On tip, waits for the chain to advance ROUND_BUFFER blocks, then retries with the same range.
  * Throws if the generator reaches tip twice, or on any fatal/unexpected exit.
@@ -63,7 +74,7 @@ async function runWriteCache(algorand: AlgorandClient, generatorPath: string, fr
   const result = await spawnWriteCache(generatorPath, from, to);
   if (result === "tip") {
     console.log(`generator reached chain tip, waiting for block ${to + ROUND_BUFFER} then retrying`);
-    await algorand.client.algod.statusAfterBlock(to + ROUND_BUFFER).do();
+    await waitForBlock(algorand, to + ROUND_BUFFER);
     const retry = await spawnWriteCache(generatorPath, from, to);
     if (retry === "tip") {
       throw new Error(`generator reached chain tip even after retrying with ${ROUND_BUFFER}-round buffer`);
@@ -119,7 +130,7 @@ export async function run(config: Config): Promise<void> {
     if (closeTo1MBoundary(currentRound)) {
       const target = next1MBoundary(currentRound);
       console.log(`approaching 1M boundary at ${target}, waiting...`);
-      await algorand.client.algod.statusAfterBlock(target + ROUND_BUFFER).do();
+      await waitForBlock(algorand, target + ROUND_BUFFER);
 
       const from = crossed100KBoundary(nextRoundToProcess, currentRound) ? currentRound + 1 : nextRoundToProcess;
       currentRound = target;
