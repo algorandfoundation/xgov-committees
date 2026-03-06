@@ -5,6 +5,8 @@ import { type Config } from "./config.ts";
 import { loadState, saveState } from "./state.ts";
 import { crossed100KBoundary, closeTo1MBoundary, next1MBoundary } from "./utils.ts";
 
+const ROUND_BUFFER = 21; // ~1m at 2.8s per block
+
 // Mirrors committee-generator's ExitCode
 const GENERATOR_EXIT_CODE = {
   SUCCESS: 0,
@@ -53,9 +55,25 @@ function spawnWriteCache(generatorPath: string, fromBlock: number, toBlock: numb
 }
 
 /**
+ * Runs spawnWriteCache, transparently retrying once if the generator signals it reached the chain tip.
+ * On tip, waits for the chain to advance ROUND_BUFFER blocks, then retries with the same range.
+ * Throws if the generator reaches tip twice, or on any fatal/unexpected exit.
+ */
+async function runWriteCache(algorand: AlgorandClient, generatorPath: string, from: number, to: number): Promise<void> {
+  const result = await spawnWriteCache(generatorPath, from, to);
+  if (result === "tip") {
+    console.log(`generator reached chain tip, waiting for block ${to + ROUND_BUFFER} then retrying`);
+    await algorand.client.algod.statusAfterBlock(to + ROUND_BUFFER).do();
+    const retry = await spawnWriteCache(generatorPath, from, to);
+    if (retry === "tip") {
+      throw new Error(`generator reached chain tip even after retrying with ${ROUND_BUFFER}-round buffer`);
+    }
+  }
+}
+
+/**
  * Runs the service loop until all run conditions are handled.
  * Re-evaluates after each action in case new run conditions are met (e.g. 100K sync may get close to 1M boundary).
- * If committee generator signals it reached the tip, exits the loop without mutating state.
  */
 export async function run(config: Config): Promise<void> {
   const algorand = AlgorandClient.fromConfig({
@@ -94,28 +112,20 @@ export async function run(config: Config): Promise<void> {
 
     if (crossed100KBoundary(nextRoundToProcess, currentRound)) {
       console.log(`100K boundary crossed, write-cache ${nextRoundToProcess}–${currentRound}`);
-      const result = await spawnWriteCache(config.committeeGeneratorPath, nextRoundToProcess, currentRound);
-      if (result === "tip") {
-        console.log("generator reached chain tip, pausing until next run");
-        break;
-      }
+      await runWriteCache(algorand, config.committeeGeneratorPath, nextRoundToProcess, currentRound);
       reRun = true;
     }
 
     if (closeTo1MBoundary(currentRound)) {
       const target = next1MBoundary(currentRound);
       console.log(`approaching 1M boundary at ${target}, waiting...`);
-      await algorand.client.algod.statusAfterBlock(target).do();
+      await algorand.client.algod.statusAfterBlock(target + ROUND_BUFFER).do();
 
       const from = crossed100KBoundary(nextRoundToProcess, currentRound) ? currentRound + 1 : nextRoundToProcess;
       currentRound = target;
 
       console.log(`1M boundary crossed, write-cache ${from}–${target}`);
-      const result = await spawnWriteCache(config.committeeGeneratorPath, from, target);
-      if (result === "tip") {
-        console.log("generator reached chain tip, pausing until next run");
-        break;
-      }
+      await runWriteCache(algorand, config.committeeGeneratorPath, from, target);
       reRun = true;
     }
 
