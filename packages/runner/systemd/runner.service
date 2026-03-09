@@ -9,4 +9,5 @@ NotifyAccess=all
 WorkingDirectory=/opt/xgov-committees/packages/runner
 ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
 WatchdogSec=65
+WatchdogSignal=SIGTERM
 User=xgov-committees-runner

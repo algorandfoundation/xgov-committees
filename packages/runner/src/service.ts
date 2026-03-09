@@ -1,29 +1,85 @@
 import { mkdirSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { AlgorandClient } from "@algorandfoundation/algokit-utils";
 import { type Config } from "./config.ts";
 import { loadState, saveState } from "./state.ts";
 import { crossed100KBoundary, closeTo1MBoundary, next1MBoundary } from "./utils.ts";
 
+const ROUND_BUFFER = 21; // ~1m at 2.8s per block
+
+// Mirrors committee-generator's ExitCode
+const GENERATOR_EXIT_CODE = {
+  SUCCESS: 0,
+  FATAL: 1,
+  EXPECTED_TIP: 10,
+} as const;
+
+// Module-level singleton: run() is called once and awaits each spawnWriteCache call.
+let activeChild: ChildProcess | null = null;
+export function getActiveChild(): ChildProcess | null {
+  return activeChild;
+}
+
 /**
- * Spawns the committee generator in "write-cache" mode to process blocks `fromBlock` `toBlock`.
- * TODO: check inclusive/exclusive and adjust runner logic or generator args accordingly.
- * @returns A promise that resolves when the process completes successfully, or rejects if an error occurs.
+ * Spawns the committee generator in write-cache mode for [fromBlock, toBlock].
+ * Resolves "success" or "tip" (generator hit the chain tip before toBlock).
+ * Rejects on fatal exit or spawn error.
+ * TODO: verify inclusive/exclusive block range with generator.
  */
-function spawnWriteCache(path: string, fromBlock: number, toBlock: number): Promise<void> {
+function spawnWriteCache(generatorPath: string, fromBlock: number, toBlock: number): Promise<"success" | "tip"> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       "node",
-      [path, "--mode", "write-cache", "--from-block", String(fromBlock), "--to-block", String(toBlock)],
+      [generatorPath, "--mode", "write-cache", "--from-block", String(fromBlock), "--to-block", String(toBlock)],
       { stdio: "inherit", env: process.env },
     );
-    child.on("error", reject);
+    activeChild = child;
+    child.on("error", (err) => {
+      activeChild = null;
+      reject(err);
+    });
     child.on("close", (code, signal) => {
-      if (code === 0) resolve();
+      activeChild = null;
+      if (code === GENERATOR_EXIT_CODE.SUCCESS) resolve("success");
+      else if (code === GENERATOR_EXIT_CODE.EXPECTED_TIP) resolve("tip");
+      else if (code === GENERATOR_EXIT_CODE.FATAL)
+        reject(new Error(`committee-generator exited with a fatal error (exit code ${code})`));
       else
-        reject(new Error(`committee-generator failed: (${code !== null ? `exit code ${code}` : `signal ${signal}`})`));
+        reject(
+          new Error(
+            `committee-generator exited unexpectedly: ${code !== null ? `exit code ${code}` : `signal ${signal}`}`,
+          ),
+        );
     });
   });
+}
+
+/**
+ * Polls algod until the chain reaches targetRound.
+ * Necessary because the statusAfterBlock times out after 1 minute.
+ */
+export async function waitForBlock(algorand: AlgorandClient, targetRound: number): Promise<void> {
+  while (true) {
+    const status = await algorand.client.algod.statusAfterBlock(targetRound - 1).do();
+    if (Number(status.lastRound) >= targetRound) return;
+  }
+}
+
+/**
+ * Runs write-cache for [from, to], retrying once if the generator hits the chain tip.
+ * On tip, waits for block `to + ROUND_BUFFER` before retrying with the same range.
+ * Throws if tip is hit twice.
+ */
+async function runWriteCache(algorand: AlgorandClient, generatorPath: string, from: number, to: number): Promise<void> {
+  const result = await spawnWriteCache(generatorPath, from, to);
+  if (result === "tip") {
+    console.log(`generator reached chain tip, waiting for block ${to + ROUND_BUFFER} then retrying`);
+    await waitForBlock(algorand, to + ROUND_BUFFER);
+    const retry = await spawnWriteCache(generatorPath, from, to);
+    if (retry === "tip") {
+      throw new Error(`generator reached chain tip even after retrying with ${ROUND_BUFFER}-round buffer`);
+    }
+  }
 }
 
 /**
@@ -67,20 +123,20 @@ export async function run(config: Config): Promise<void> {
 
     if (crossed100KBoundary(nextRoundToProcess, currentRound)) {
       console.log(`100K boundary crossed, write-cache ${nextRoundToProcess}–${currentRound}`);
-      await spawnWriteCache(config.committeeGeneratorPath, nextRoundToProcess, currentRound);
+      await runWriteCache(algorand, config.committeeGeneratorPath, nextRoundToProcess, currentRound);
       reRun = true;
     }
 
     if (closeTo1MBoundary(currentRound)) {
       const target = next1MBoundary(currentRound);
       console.log(`approaching 1M boundary at ${target}, waiting...`);
-      await algorand.client.algod.statusAfterBlock(target).do();
+      await waitForBlock(algorand, target + ROUND_BUFFER);
 
       const from = crossed100KBoundary(nextRoundToProcess, currentRound) ? currentRound + 1 : nextRoundToProcess;
       currentRound = target;
 
       console.log(`1M boundary crossed, write-cache ${from}–${target}`);
-      await spawnWriteCache(config.committeeGeneratorPath, from, target);
+      await runWriteCache(algorand, config.committeeGeneratorPath, from, target);
       reRun = true;
     }
 
