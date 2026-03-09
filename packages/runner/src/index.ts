@@ -16,14 +16,14 @@ async function shutdown(reason: string, exitCode: number): Promise<never> {
   if (shuttingDown) process.exit(exitCode);
   shuttingDown = true;
 
-  clearInterval(watchdogHandle);
-  console.log(`Shutting down (${reason})`);
-
   try {
-    notifySystemd("STOPPING=1");
+    notifySystemd(`STOPPING=1\nSTATUS=Shutting down: ${reason}`);
   } catch {
     // best effort
   }
+
+  clearInterval(watchdogHandle);
+  console.log(`Shutting down (${reason})`);
 
   const child = getActiveChild();
   if (child) {
