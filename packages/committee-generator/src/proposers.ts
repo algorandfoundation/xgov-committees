@@ -52,9 +52,8 @@ const _getBlockProposers = async (rnds: number[]): Promise<ProposerMap> => {
  * Guarded by shutdown decorator to prevent starting during shutdown.
  * If shutdown is initiated while fetching, throws ShuttingDownError.
  */
-export const getBlockProposers = guardWhileNotShuttingDown(
-  _getBlockProposers as unknown as (...args: unknown[]) => Promise<unknown>,
-) as unknown as typeof _getBlockProposers;
+export const getBlockProposers: typeof _getBlockProposers =
+  guardWhileNotShuttingDown(_getBlockProposers);
 
 /**
  * Parse and validate proposer map from file contents.

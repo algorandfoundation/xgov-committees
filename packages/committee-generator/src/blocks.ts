@@ -94,9 +94,7 @@ const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
  * Guarded by shutdown decorator to prevent starting during shutdown.
  * If shutdown is initiated while fetching, throws ShuttingDownError.
  */
-export const getBlocks = guardWhileNotShuttingDown(
-  _getBlocks as unknown as (...args: unknown[]) => Promise<unknown>,
-) as unknown as typeof _getBlocks;
+export const getBlocks: typeof _getBlocks = guardWhileNotShuttingDown(_getBlocks);
 
 const _getBlock = async (
   rnd: number,
@@ -154,6 +152,4 @@ const _getBlock = async (
  * Fetch a single block from the Algorand node and cache it.
  * Guarded by shutdown decorator to prevent starting during shutdown.
  */
-export const getBlock = guardWhileNotShuttingDown(
-  _getBlock as unknown as (...args: unknown[]) => Promise<unknown>,
-) as unknown as typeof _getBlock;
+export const getBlock: typeof _getBlock = guardWhileNotShuttingDown(_getBlock);
