@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 
-dotenv.config({ quiet: true, path: process.env.ENV });
+dotenv.config({ quiet: true });
 
 export interface Config {
   algodServer: string;
