@@ -13,7 +13,7 @@ export async function setup() {
 
   try {
     console.log('[global-setup] Starting LocalStack...');
-    localStackContainer = await new GenericContainer('localstack/localstack-s3:latest')
+    localStackContainer = await new GenericContainer('localstack/localstack:latest')
       .withEnvironment({
         SERVICES: 's3',
         DEBUG: '0',
