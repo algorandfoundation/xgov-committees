@@ -15,8 +15,10 @@ const { cacheMode, fromBlock, toBlock } = config;
 
 console.log(`Running in cache mode: ${cacheMode}`);
 
-// Enable async resource tracking for graceful shutdown
-enableAsyncTracking();
+// Enable async resource tracking for graceful shutdown only when needed
+if (cacheMode === 'write-cache') {
+  enableAsyncTracking();
+}
 
 const cacheModes: Record<CacheMode, () => Promise<void>> = {
   'validate-cache': () => runValidateCache(fromBlock, toBlock),
