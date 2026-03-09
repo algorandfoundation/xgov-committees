@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+# Called by `npm run test:unit`.
+# On Linux: runs vitest natively (unix_dgram + systemd-analyze are available).
+# Elsewhere: builds a Linux+Node container and runs vitest inside it.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNNER_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+if [ "$(uname)" = "Linux" ]; then
+  cd "$RUNNER_DIR"
+  exec node_modules/.bin/vitest run test/unit
+else
+  IMAGE="xgov-runner-test"
+  docker build --target unit-test -t "$IMAGE" -f "$RUNNER_DIR/test/Dockerfile" "$RUNNER_DIR"
+  docker run --rm "$IMAGE"
+fi
