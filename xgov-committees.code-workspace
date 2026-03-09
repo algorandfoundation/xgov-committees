@@ -8,6 +8,10 @@
       "name": "committee-generator",
       "path": "packages/committee-generator",
     },
+    {
+      "name": "runner",
+      "path": "packages/runner",
+    },
   ],
   "settings": {
     "typescript.tsdk": "node_modules/typescript/lib",
