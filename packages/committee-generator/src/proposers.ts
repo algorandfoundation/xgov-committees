@@ -7,6 +7,7 @@ import { ensureCacheSubPathExists } from './cache';
 import { getCachePath } from './cache/utils';
 import { CACHE_PAGE_SIZE } from './cache/cache-page';
 import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
+import { guardWhileNotShuttingDown } from './shutdown';
 
 export type ProposerMap = Map<string, number[]>;
 
@@ -16,10 +17,10 @@ const cacheSubPath = 'proposers';
 /*
  * Create proposer map of [proposer] -> proposed_round[]
  */
-export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
+const _getBlockProposers = async (rnds: number[]): Promise<ProposerMap> => {
   const proposers: ProposerMap = new Map();
 
-  let total = rnds.length;
+  const total = rnds.length;
   let processed = 0;
   const chunks = chunk(rnds, CACHE_PAGE_SIZE);
   for (const chunked of chunks) {
@@ -44,7 +45,16 @@ export async function getBlockProposers(rnds: number[]): Promise<ProposerMap> {
   clearLine();
   process.stdout.write(`\rProposer data:\t${total} OK\n`);
   return proposers;
-}
+};
+
+/**
+ * Fetch proposer data for blocks and create a proposer map.
+ * Guarded by shutdown decorator to prevent starting during shutdown.
+ * If shutdown is initiated while fetching, throws ShuttingDownError.
+ */
+export const getBlockProposers = guardWhileNotShuttingDown(
+  _getBlockProposers as unknown as (...args: unknown[]) => Promise<unknown>,
+) as unknown as typeof _getBlockProposers;
 
 /**
  * Parse and validate proposer map from file contents.
