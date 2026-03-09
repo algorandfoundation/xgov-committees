@@ -2,3 +2,6 @@ node_modules/
 dist/
 .env.*.private
 .env
+
+# Test runtime files
+test/.localstack-config.json

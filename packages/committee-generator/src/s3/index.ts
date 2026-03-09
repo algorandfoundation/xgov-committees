@@ -17,14 +17,12 @@ import { committeeIdToSafeFileName, getMD5Hash, walkDir } from '../utils';
 import { relative } from 'path';
 import { getCommitteeID, loadCommittee } from '../committee';
 
-const {
-  s3: { bucketName, region, endpoint, accessKeyId, secretAccessKey, publicUrl },
-} = config;
-
 // Initialize S3 client
 let s3Client: S3Client | null = null;
 
 export function getS3Client(): S3Client {
+  const { accessKeyId, secretAccessKey, region, endpoint } = config.s3;
+
   if (!accessKeyId || !secretAccessKey) {
     throw new Error(
       'S3 credentials are not fully configured. Please set S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY in your environment variables.',
@@ -35,13 +33,22 @@ export function getS3Client(): S3Client {
     s3Client = new S3Client({
       region: region,
       endpoint: endpoint,
+      forcePathStyle: true, // Required for LocalStack and custom S3-compatible services
       credentials: {
         accessKeyId: accessKeyId,
         secretAccessKey: secretAccessKey,
       },
     });
   }
+
   return s3Client;
+}
+
+/**
+ * Resets the S3 client singleton. Useful for testing to force recreation with new config.
+ */
+export function resetS3Client(): void {
+  s3Client = null;
 }
 
 /**
@@ -51,6 +58,7 @@ export function getS3Client(): S3Client {
  */
 export async function deleteDirectory(dirPrefix: string): Promise<void> {
   const client = getS3Client();
+  const { bucketName } = config.s3;
 
   if (config.verbose) {
     console.log(`Deleting directory: s3://${bucketName}/${dirPrefix}`);
@@ -112,6 +120,7 @@ export async function deleteDirectory(dirPrefix: string): Promise<void> {
  */
 export async function objectExists(key: string): Promise<boolean> {
   const client = getS3Client();
+  const { bucketName } = config.s3;
 
   try {
     await client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
@@ -140,8 +149,10 @@ export async function objectExists(key: string): Promise<boolean> {
  */
 export async function listKeysWithPrefix(prefix: string): Promise<Set<string>> {
   const client = getS3Client();
+  const { bucketName } = config.s3;
   const keys = new Set<string>();
   let continuationToken: string | undefined;
+
   do {
     const page = await client.send(
       new ListObjectsV2Command({
@@ -165,6 +176,7 @@ export async function listKeysWithPrefix(prefix: string): Promise<Set<string>> {
  */
 export async function ensureCommitteeShortcuts(): Promise<void> {
   const client = getS3Client();
+  const { bucketName } = config.s3;
 
   if (config.verbose) {
     console.log('Ensuring committee shortcuts exist in S3...');
@@ -296,6 +308,7 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
 
 export async function syncDirectory(directoryPath: string) {
   const client = getS3Client();
+  const { bucketName } = config.s3;
   // Note: streaming file bodies avoids loading whole files into memory.
   const UPLOAD_CONCURRENCY = 25;
   const LIST_CONCURRENCY = 5;
@@ -409,6 +422,7 @@ export async function syncDirectory(directoryPath: string) {
  * or undefined if not found. Throws on error.
  */
 export async function getMD5HashForObject(key: string): Promise<string | undefined> {
+  const { publicUrl } = config.s3;
   const url = `${publicUrl.replace(/\/$/, '')}/${key}`;
   const response = await fetch(url, { method: 'HEAD' });
   if (response.status === 404) {
@@ -430,14 +444,15 @@ export async function getMD5HashForObject(key: string): Promise<string | undefin
  * @param data string or buffer data to upload
  * @param force if true, forces upload even if the object already exists (default: false)
  * @throws Will throw an error if the upload fails
- * @returns {Promise<void>} Resolves when upload is complete
+ * @returns {Promise<boolean>} Resolves when upload is completed or skipped due to existing identical object. Returns true if upload was performed, false if skipped.
  */
 export async function uploadData(
   key: string,
   data: string | Uint8Array | Buffer,
   force: boolean = false,
-): Promise<void> {
+): Promise<boolean> {
   const client = getS3Client();
+  const { bucketName } = config.s3;
 
   if (!force) {
     try {
@@ -448,7 +463,7 @@ export async function uploadData(
         if (config.verbose) {
           console.log(`Skipping upload for s3://${bucketName}/${key}, data is unchanged.`);
         }
-        return;
+        return false;
       }
     } catch (error) {
       // Log the error but proceed with the upload, as the MD5 check is an optimization, not a requirement.
@@ -468,6 +483,8 @@ export async function uploadData(
       Body: data,
     }),
   );
+
+  return true;
 }
 
 /**
@@ -489,5 +506,6 @@ export function getKeyWithNetworkMetadata(keySuffix: string): string {
  * @returns {string} Public URL for the object
  */
 export function getPublicUrlForObject(keySuffix: string): string {
+  const { publicUrl } = config.s3;
   return `${publicUrl.replace(/\/$/, '')}/${getKeyWithNetworkMetadata(keySuffix)}`;
 }
