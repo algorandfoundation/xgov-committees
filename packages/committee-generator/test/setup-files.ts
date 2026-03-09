@@ -87,9 +87,7 @@ vi.mock('../src/config', () => ({
     get s3() {
       const endpoint = cachedEndpoint || 'http://localhost:4566';
       const bucketName = TEST_BUCKET_NAME;
-      console.log(
-        `[setup-files config.s3 getter] returning endpoint="${endpoint}" bucketName="${bucketName}"`,
-      );
+
       // Return dynamic config with cached endpoint from global setup
       return {
         accessKeyId: 'test',
