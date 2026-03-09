@@ -65,7 +65,7 @@ beforeAll(async () => {
     console.log('[setupFiles beforeAll] Bucket created/verified');
   } catch (error: any) {
     // Bucket might already exist, which is OK
-    if (error.Code !== 'BucketAlreadyExists' && error.Code !== 'BucketAlreadyOwnedByYou') {
+    if (error.name !== 'BucketAlreadyExists' && error.name !== 'BucketAlreadyOwnedByYou') {
       console.warn('[setupFiles beforeAll] Bucket creation warning:', error.message);
     }
   }
