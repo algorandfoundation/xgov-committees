@@ -1,11 +1,22 @@
 import { ensureCacheSubPathExists } from './cache';
 import { CacheMode, config } from './config';
 import { runUseCache, runValidateCache, runWriteCache } from './modes';
-import { ExitCode, expectedExit, fatalError, gracefulShutdown } from './shutdown';
+import {
+  ExitCode,
+  expectedExit,
+  fatalError,
+  gracefulShutdown,
+  enableAsyncTracking,
+  ShuttingDownError,
+  awaitShutdown,
+} from './shutdown';
 
 const { cacheMode, fromBlock, toBlock } = config;
 
 console.log(`Running in cache mode: ${cacheMode}`);
+
+// Enable async resource tracking for graceful shutdown
+enableAsyncTracking();
 
 const cacheModes: Record<CacheMode, () => Promise<void>> = {
   'validate-cache': () => runValidateCache(fromBlock, toBlock),
@@ -28,6 +39,13 @@ await ensureCacheSubPathExists('blocks');
 try {
   await cacheModes[cacheMode]();
 } catch (error: unknown) {
+  // Handle shutdown gracefully if operation was interrupted during shutdown
+  if (error instanceof ShuttingDownError) {
+    console.log('Operation interrupted due to shutdown signal, waiting for cleanup to complete...');
+    // Shutdown was initiated by SIGTERM/SIGINT signal handler
+    // Wait for the shutdown process to complete (which will exit the process)
+    await awaitShutdown();
+  }
   await fatalError(error);
 }
 

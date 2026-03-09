@@ -5,9 +5,9 @@ import { subtractCached, getCache, setCache } from './cache';
 import { chunk, clearLine, formatDuration, sleep } from './utils';
 import { BlockHeader } from 'algosdk';
 import { BlockResponse } from 'algosdk/dist/types/client/v2/algod/models/types';
-import { ExitCode, expectedExit, fatalError } from './shutdown';
+import { ExitCode, expectedExit, fatalError, guardWhileNotShuttingDown } from './shutdown';
 
-export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
+const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   const total = rnds.length;
   let v = '';
   const startBlock = rnds[0];
@@ -67,7 +67,7 @@ export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   process.stdout.write(`Block data: \t${total} OK\n`);
 
   async function getBlockWithStatus(rnd: number): Promise<BlockHeader | undefined> {
-    const data = await getBlock(rnd, skipCache);
+    const data: BlockHeader | undefined = await getBlock(rnd, skipCache);
     processed++;
     const percent = ((100 * processed) / total).toFixed(2);
     const etaSec = (total - processed) / parseFloat(v);
@@ -80,7 +80,16 @@ export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   }
 };
 
-export const getBlock = async (
+/**
+ * Fetch blocks from the Algorand node and cache them.
+ * Guarded by shutdown decorator to prevent starting during shutdown.
+ * If shutdown is initiated while fetching, throws ShuttingDownError.
+ */
+export const getBlocks = guardWhileNotShuttingDown(
+  _getBlocks as unknown as (...args: unknown[]) => Promise<unknown>,
+) as unknown as typeof _getBlocks;
+
+const _getBlock = async (
   rnd: number,
   skipCache: boolean = false,
 ): Promise<BlockHeader | undefined> => {
@@ -130,3 +139,11 @@ export const getBlock = async (
   setCache(rnd, data.block.header);
   return data.block.header;
 };
+
+/**
+ * Fetch a single block from the Algorand node and cache it.
+ * Guarded by shutdown decorator to prevent starting during shutdown.
+ */
+export const getBlock = guardWhileNotShuttingDown(
+  _getBlock as unknown as (...args: unknown[]) => Promise<unknown>,
+) as unknown as typeof _getBlock;
