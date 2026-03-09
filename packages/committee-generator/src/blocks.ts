@@ -7,6 +7,16 @@ import { BlockHeader } from 'algosdk';
 import { BlockResponse } from 'algosdk/dist/types/client/v2/algod/models/types';
 import { ExitCode, expectedExit, fatalError, guardWhileNotShuttingDown } from './shutdown';
 
+/**
+ * Error thrown when attempting to fetch a block beyond the blockchain tip.
+ */
+export class TipReachedError extends Error {
+  constructor(public readonly blockNumber: number) {
+    super(`Block ${blockNumber} not available. The tip of the blockchain has been reached.`);
+    this.name = 'TipReachedError';
+  }
+}
+
 const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   const total = rnds.length;
   let v = '';
@@ -37,7 +47,7 @@ const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
         async (rnd) => {
           const result = await getBlockWithStatus(rnd);
           if (result === undefined) {
-            throw new Error(`Block ${rnd} returned undefined. The tip has been reached.`);
+            throw new TipReachedError(rnd);
           }
           return result;
         },
@@ -49,14 +59,13 @@ const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
       const elapsed = end - start; // in ms
       v = ((1000 * chunk.length) / elapsed).toFixed(2);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(msg);
       // Check if the error is due to reaching the tip of the blockchain
-      const match = msg.match(/Block \d+ returned undefined. The tip has been reached./);
-      if (match) {
-        await expectedExit(ExitCode.EXPECTED_TIP, 'Tip reached during block fetching');
+      if (e instanceof TipReachedError) {
+        await expectedExit(ExitCode.EXPECTED_TIP, `Tip reached at block ${e.blockNumber}`);
         return;
       }
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(msg);
       await fatalError(e);
     }
 
@@ -123,9 +132,10 @@ const _getBlock = async (
     data = await algod.block(rnd).headerOnly(true).do();
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
+    // Check if block is not available (404 error from ledger)
     if (
-      errorMessage.includes(
-        'Network request error. Received status 404 (Not Found): failed to retrieve information from the ledger',
+      /Network request error\. Received status 404 \(Not Found\): failed to retrieve information from the ledger/.test(
+        errorMessage,
       )
     ) {
       // block not yet available, should be handled gracefully.
