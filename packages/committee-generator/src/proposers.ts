@@ -152,7 +152,8 @@ export async function saveProposers(
   if (to === 's3') {
     const key = getKeyWithNetworkMetadata(`${cacheSubPath}/${fromBlock}-${toBlock}.jsons`);
 
-    return await uploadData(key, serializeProposers(proposers));
+    await uploadData(key, serializeProposers(proposers));
+    return;
   }
 
   const cachePath = getCachePath(cacheSubPath);
