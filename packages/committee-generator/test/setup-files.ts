@@ -126,3 +126,9 @@ export function getGlobalLocalStack() {
     publicUrl: cachedPublicUrl,
   };
 }
+
+// Helper to reset S3 client singleton
+export async function resetS3ClientForTests() {
+  const { resetS3Client } = await import('../src/s3');
+  resetS3Client();
+}

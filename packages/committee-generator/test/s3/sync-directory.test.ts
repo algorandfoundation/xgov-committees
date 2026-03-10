@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { getGlobalLocalStack, TEST_BUCKET_NAME } from '../setup-files';
+import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files';
 import { getExpectedKey, cleanupS3Prefix } from './helpers';
 import { mkdtemp, rm, writeFile, mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
@@ -8,13 +8,11 @@ import { join } from 'path';
 
 let tempDir: string | null = null;
 
-// Create temp directory before each test
+// Create temp directory and clean S3 before each test
 beforeEach(async () => {
-  // Reset the S3 client singleton to pick up new config
-  const { resetS3Client } = await import('../../src/s3');
-  resetS3Client();
+  await resetS3ClientForTests();
 
-  // Clean up any existing S3 objects from previous tests
+  // Clean up all S3 objects for the test network
   const { s3Client } = getGlobalLocalStack();
   const prefix = getExpectedKey('');
   await cleanupS3Prefix(s3Client, prefix);
@@ -25,11 +23,6 @@ beforeEach(async () => {
 
 // Clean up after each test
 afterEach(async () => {
-  // Clean up S3 objects
-  const { s3Client } = getGlobalLocalStack();
-  const prefix = getExpectedKey('');
-  await cleanupS3Prefix(s3Client, prefix);
-
   // Clean up temp directory
   if (tempDir) {
     await rm(tempDir, { recursive: true, force: true });

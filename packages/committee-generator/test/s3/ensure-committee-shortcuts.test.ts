@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { getGlobalLocalStack, TEST_BUCKET_NAME } from '../setup-files';
+import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files';
 import { createCommitteeFixture, getExpectedKey, cleanupS3Prefix } from './helpers';
 import type { Committee } from '../../src/committee';
 
@@ -28,22 +28,14 @@ vi.mock('../../src/committee', async (importOriginal) => {
   };
 });
 
-// Reset before each test
+// Reset S3 client and clean bucket before each test
 beforeEach(async () => {
-  const { resetS3Client } = await import('../../src/s3');
-  resetS3Client();
+  await resetS3ClientForTests();
   committeeStore.clear();
 
-  // Clean up any existing S3 objects from previous tests
+  // Clean up all S3 objects for the test network
   const { s3Client } = getGlobalLocalStack();
   const prefix = getExpectedKey('');
-  await cleanupS3Prefix(s3Client, prefix);
-});
-
-// Clean up after each test
-afterEach(async () => {
-  const { s3Client } = getGlobalLocalStack();
-  const prefix = getExpectedKey('committee/');
   await cleanupS3Prefix(s3Client, prefix);
 });
 

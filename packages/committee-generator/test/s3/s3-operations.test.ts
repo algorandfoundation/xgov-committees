@@ -1,19 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getGlobalLocalStack, TEST_BUCKET_NAME } from '../setup-files';
+import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files';
 import { getExpectedKey, cleanupS3Prefix } from './helpers';
 
 // Reset S3 client and clean bucket before each test
 beforeEach(async () => {
-  // Reset the S3 client singleton to pick up new config
-  const { resetS3Client } = await import('../../src/s3');
-  resetS3Client();
-});
+  await resetS3ClientForTests();
 
-// Clean up test objects after each test
-afterEach(async () => {
+  // Clean up all S3 objects for the test network
   const { s3Client } = getGlobalLocalStack();
-  const prefix = getExpectedKey('test/');
+  const prefix = getExpectedKey('');
   await cleanupS3Prefix(s3Client, prefix);
 });
 
