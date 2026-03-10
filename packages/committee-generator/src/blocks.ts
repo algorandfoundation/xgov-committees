@@ -5,7 +5,7 @@ import { subtractCached, getCache, setCache } from './cache';
 import { chunk, clearLine, formatDuration, sleep } from './utils';
 import { BlockHeader } from 'algosdk';
 import { BlockResponse } from 'algosdk/dist/types/client/v2/algod/models/types';
-import { ExitCode, expectedExit, fatalError, guardWhileNotShuttingDown } from './shutdown';
+import { guardWhileNotShuttingDown } from './shutdown';
 
 /**
  * Error thrown when attempting to fetch a block beyond the blockchain tip.
@@ -40,34 +40,19 @@ const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
 
   const chunks = chunk(requiredRnds, 1_000);
   for (const chunk of chunks) {
-    try {
-      const start = Date.now();
-      await pMap(
-        chunk,
-        async (rnd) => {
-          const result = await getBlockWithStatus(rnd);
-          if (result === undefined) {
-            throw new TipReachedError(rnd);
-          }
-          return result;
-        },
-        {
-          concurrency: config.concurrency,
-        },
-      );
-      const end = Date.now();
-      const elapsed = end - start; // in ms
-      v = ((1000 * chunk.length) / elapsed).toFixed(2);
-    } catch (e) {
-      // Check if the error is due to reaching the tip of the blockchain
-      if (e instanceof TipReachedError) {
-        await expectedExit(ExitCode.EXPECTED_TIP, `Tip reached at block ${e.blockNumber}`);
-        return;
-      }
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(msg);
-      await fatalError(e);
-    }
+    const start = Date.now();
+    await pMap(
+      chunk,
+      async (rnd) => {
+        return await getBlockWithStatus(rnd);
+      },
+      {
+        concurrency: config.concurrency,
+      },
+    );
+    const end = Date.now();
+    const elapsed = end - start; // in ms
+    v = ((1000 * chunk.length) / elapsed).toFixed(2);
 
     await sleep(50); // pause for gc
   }
@@ -75,8 +60,8 @@ const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   clearLine();
   process.stdout.write(`Block data: \t${total} OK\n`);
 
-  async function getBlockWithStatus(rnd: number): Promise<BlockHeader | undefined> {
-    const data: BlockHeader | undefined = await getBlock(rnd, skipCache);
+  async function getBlockWithStatus(rnd: number): Promise<BlockHeader> {
+    const data: BlockHeader = await getBlock(rnd, skipCache);
     processed++;
     const percent = ((100 * processed) / total).toFixed(2);
     const etaSec = (total - processed) / parseFloat(v);
@@ -96,10 +81,7 @@ const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
  */
 export const getBlocks: typeof _getBlocks = guardWhileNotShuttingDown(_getBlocks);
 
-const _getBlock = async (
-  rnd: number,
-  skipCache: boolean = false,
-): Promise<BlockHeader | undefined> => {
+const _getBlock = async (rnd: number, skipCache: boolean = false): Promise<BlockHeader> => {
   let cached: BlockHeader | undefined;
   if (!skipCache && (cached = await getCache(rnd))) {
     try {
@@ -136,8 +118,7 @@ const _getBlock = async (
         errorMessage,
       )
     ) {
-      // block not yet available, should be handled gracefully.
-      return undefined;
+      throw new TipReachedError(rnd);
     }
 
     // rethrow other errors

@@ -1,3 +1,4 @@
+import { TipReachedError } from './blocks';
 import { ensureCacheSubPathExists } from './cache';
 import { CacheMode, config } from './config';
 import { runUseCache, runValidateCache, runWriteCache } from './modes';
@@ -41,14 +42,18 @@ await ensureCacheSubPathExists('blocks');
 try {
   await cacheModes[cacheMode]();
 } catch (error: unknown) {
-  // Handle shutdown gracefully if operation was interrupted during shutdown
-  if (error instanceof ShuttingDownError) {
+  if (error instanceof TipReachedError) {
+    await expectedExit(ExitCode.EXPECTED_TIP, `Tip reached at block ${error.blockNumber}`);
+  } else if (error instanceof ShuttingDownError) {
+    // Handle shutdown gracefully if operation was interrupted during shutdown
     console.log('Operation interrupted due to shutdown signal, waiting for cleanup to complete...');
     // Shutdown was initiated by SIGTERM/SIGINT signal handler
     // Wait for the shutdown process to complete (which will exit the process)
     await awaitShutdown();
+  } else {
+    // unexpected error, log and exit with failure
+    await fatalError(error);
   }
-  await fatalError(error);
 }
 
 await expectedExit(ExitCode.SUCCESS, `${cacheMode} operation completed successfully`);
