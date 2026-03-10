@@ -15,6 +15,7 @@ export default tseslint.config(
       '**/*.md',
       '**/data/**',
       '**/test_data/**',
+      '**/test/**/fixtures/**',
     ],
   },
 

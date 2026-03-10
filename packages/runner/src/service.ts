@@ -70,7 +70,12 @@ export async function waitForBlock(algorand: AlgorandClient, targetRound: number
  * On tip, waits for block `to + ROUND_BUFFER` before retrying with the same range.
  * Throws if tip is hit twice.
  */
-async function runWriteCache(algorand: AlgorandClient, generatorPath: string, from: number, to: number): Promise<void> {
+export async function runWriteCache(
+  algorand: AlgorandClient,
+  generatorPath: string,
+  from: number,
+  to: number,
+): Promise<void> {
   const result = await spawnWriteCache(generatorPath, from, to);
   if (result === "tip") {
     console.log(`generator reached chain tip, waiting for block ${to + ROUND_BUFFER} then retrying`);
