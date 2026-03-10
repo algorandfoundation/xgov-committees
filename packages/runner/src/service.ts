@@ -121,9 +121,12 @@ export async function run(config: Config): Promise<void> {
     console.log(`[#${runCounter}] round ${currentRound}, next to process: ${nextRoundToProcess}`);
 
     if (currentRound <= nextRoundToProcess) {
-      throw new Error(
-        `algod returned round ${currentRound} which is not ahead of the next round to process ${nextRoundToProcess}`,
-      );
+      if (runCounter === 1)
+        throw new Error(
+          `algod returned round ${currentRound} which is not ahead of the next round to process ${nextRoundToProcess}`,
+        );
+      console.log(`caught up at round ${currentRound - 1}, exiting`);
+      break;
     }
 
     if (crossed100KBoundary(nextRoundToProcess, currentRound)) {

@@ -441,12 +441,39 @@ describe("run", () => {
     await expect(run(makeConfig())).rejects.toThrow("No existing state file found");
   });
 
-  it("throws when algod round is not ahead of the next round to process", async () => {
+  it("throws on first iteration when algod round is not ahead of the next round to process", async () => {
     // currentRound (58_000_040) == nextRoundToProcess (58_000_040)
     const { algorand } = makeRunAlgorand(58_000_040n);
     mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
     mockLoadState.mockReturnValue({ lastProcessedRound: 58_000_039, updatedAt: "" });
 
     await expect(run(makeConfig())).rejects.toThrow("not ahead of the next round to process");
+  });
+
+  it("exits cleanly on second iteration when algod has not advanced past the last processed round", async () => {
+    // Iteration 1: 100K boundary crossed → write-cache, saveState.
+    // Iteration 2: algod still returns the same round (timer fired before new blocks) → clean break.
+    const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
+    const getTransactionParams = vi
+      .fn()
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 58_000_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 58_000_042n, genesisHash }) });
+    mockFromConfig.mockReturnValue({
+      client: { algod: { getTransactionParams, statusAfterBlock: vi.fn() } },
+    } as unknown as AlgorandClient);
+    mockLoadState
+      .mockReturnValueOnce({ lastProcessedRound: 57_996_051, updatedAt: "" })
+      .mockReturnValueOnce({ lastProcessedRound: 58_000_042, updatedAt: "" });
+
+    const { child, emitClose } = makeChildProcess(0);
+    mockSpawn.mockImplementation(() => {
+      process.nextTick(emitClose);
+      return child;
+    });
+
+    await expect(run(makeConfig())).resolves.toBeUndefined();
+    expect(mockSpawn).toHaveBeenCalledOnce();
+    expect(mockSaveState).toHaveBeenCalledOnce();
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining("caught up"));
   });
 });
