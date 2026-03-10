@@ -21,7 +21,16 @@ describe("runner smoke test", () => {
     chmodSync(fakeNotify, 0o755);
 
     stateDir = mkdtempSync(join(tmpdir(), "runner-state-"));
-    const resp = await fetch("https://mainnet-api.4160.nodely.dev/v2/transactions/params");
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 10_000);
+    let resp: Response;
+    try {
+      resp = await fetch("https://mainnet-api.4160.nodely.dev/v2/transactions/params", {
+        signal: abort.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     const { "last-round": lastRound } = (await resp.json()) as { "last-round": number };
     // Seed 2 blocks behind tip so tests with no boundary crossed exit cleanly.
     saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
