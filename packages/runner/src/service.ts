@@ -60,8 +60,12 @@ function spawnWriteCache(generatorPath: string, fromBlock: number, toBlock: numb
  */
 export async function waitForBlock(algorand: AlgorandClient, targetRound: number): Promise<void> {
   while (true) {
-    const status = await algorand.client.algod.statusAfterBlock(targetRound - 1).do();
-    if (Number(status.lastRound) >= targetRound) return;
+    try {
+      const status = await algorand.client.algod.statusAfterBlock(targetRound - 1).do();
+      if (Number(status.lastRound) >= targetRound) return;
+    } catch (err) {
+      console.warn(`waitForBlock: algod error, retrying (${err instanceof Error ? err.message : err})`);
+    }
   }
 }
 
