@@ -1,0 +1,12 @@
+[Unit]
+Description=xGov Committee Service Runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=all
+WorkingDirectory=/opt/xgov-committees/packages/runner
+ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
+WatchdogSec=65
+User=xgov-committee-runner

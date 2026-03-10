@@ -1,0 +1,46 @@
+{
+  "name": "xgov-committee-generator",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.978.0",
+    "algosdk": "^3.3.1",
+    "dotenv": "^17.2.1",
+    "js-sha512": "^0.9.0",
+    "json-schema": "^0.4.0",
+    "p-map": "^7.0.3",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/ajv": "^0.0.5",
+    "@types/json-schema": "^7.0.15",
+    "@types/node": "^24.1.0",
+    "@types/yargs": "^17.0.33",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^3.0.1",
+    "testcontainers": "^11.12.0",
+    "vitest": "^3.2.4"
+  },
+  "type": "module"
+}
