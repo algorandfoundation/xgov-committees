@@ -64,9 +64,9 @@ beforeAll(async () => {
     await s3Client.send(new CreateBucketCommand({ Bucket: TEST_BUCKET_NAME }));
     console.log('[setupFiles beforeAll] Bucket created/verified');
   } catch (error: any) {
-    // Bucket might already exist, which is OK
+    // Bucket already exists is OK, but other errors should fail immediately
     if (error.name !== 'BucketAlreadyExists' && error.name !== 'BucketAlreadyOwnedByYou') {
-      console.warn('[setupFiles beforeAll] Bucket creation warning:', error.message);
+      throw error;
     }
   }
 });
