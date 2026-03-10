@@ -10,11 +10,15 @@ RUN ln -sf /usr/local/bin/node /usr/bin/node
 
 RUN useradd --system --no-create-home xgov-committees-runner
 
-WORKDIR /opt/xgov-committees/packages/runner
-# TODO: refactor to use the workspace root lock file instead.
+WORKDIR /opt/xgov-committees
+
+# Install runner dependencies using the workspace root lock file.
 COPY package.json package-lock.json ./
-RUN npm ci
-COPY . .
+COPY packages/runner/package.json packages/runner/
+RUN npm ci --workspace=packages/runner
+
+WORKDIR /opt/xgov-committees/packages/runner
+COPY packages/runner/ .
 
 # ── unit-test ─────────────────────────────────────────────────────────────────
 FROM base AS unit-test
