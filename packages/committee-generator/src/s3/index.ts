@@ -30,15 +30,21 @@ export function getS3Client(): S3Client {
   }
 
   if (!s3Client) {
-    s3Client = new S3Client({
+    const clientConfig: any = {
       region: region,
       endpoint: endpoint,
-      forcePathStyle: true, // Required for LocalStack and custom S3-compatible services
       credentials: {
         accessKeyId: accessKeyId,
         secretAccessKey: secretAccessKey,
       },
-    });
+    };
+
+    // Required for LocalStack and custom S3-compatible services; not needed for real AWS S3
+    if (endpoint) {
+      clientConfig.forcePathStyle = true;
+    }
+
+    s3Client = new S3Client(clientConfig);
   }
 
   return s3Client;
