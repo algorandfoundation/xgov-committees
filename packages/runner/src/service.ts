@@ -84,7 +84,7 @@ async function runWriteCache(algorand: AlgorandClient, generatorPath: string, fr
 
 /**
  * Runs the service loop until all run conditions are handled.
- * Re-evaluates after each action in case new run conditions are met (e.g. 100K sync may get close to 1M boundary).
+ * Re-evaluates after each write-cache op in case new boundaries are met (e.g. 100K sync may get close to 1M boundary).
  */
 export async function run(config: Config): Promise<void> {
   const algorand = AlgorandClient.fromConfig({
@@ -100,7 +100,7 @@ export async function run(config: Config): Promise<void> {
 
   while (true) {
     runCounter++;
-    let reRun = false;
+    let wroteCache = false;
     const params = await algorand.client.algod.getTransactionParams().do();
     const genesisHash = Buffer.from(params.genesisHash).toString("base64");
     let currentRound = Number(params.firstValid);
@@ -124,7 +124,7 @@ export async function run(config: Config): Promise<void> {
     if (crossed100KBoundary(nextRoundToProcess, currentRound)) {
       console.log(`100K boundary crossed, write-cache ${nextRoundToProcess}–${currentRound}`);
       await runWriteCache(algorand, config.committeeGeneratorPath, nextRoundToProcess, currentRound);
-      reRun = true;
+      wroteCache = true;
     }
 
     if (closeTo1MBoundary(currentRound)) {
@@ -137,15 +137,14 @@ export async function run(config: Config): Promise<void> {
 
       console.log(`1M boundary crossed, write-cache ${from}–${target}`);
       await runWriteCache(algorand, config.committeeGeneratorPath, from, target);
-      reRun = true;
+      wroteCache = true;
     }
+
+    if (!wroteCache) break;
 
     saveState(config.stateDir, genesisHash, config.registryAppId, {
       lastProcessedRound: currentRound,
       updatedAt: new Date().toISOString(),
     });
-
-    // all caught up, exit
-    if (!reRun) break;
   }
 }
