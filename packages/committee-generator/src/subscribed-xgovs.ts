@@ -142,7 +142,8 @@ export async function saveSubscribedXgovs(
   if (to === 's3') {
     const key = getKeyWithNetworkMetadata(`${cacheSubPath}/${fromBlock}-${toBlock}.json`);
 
-    return await uploadData(key, JSON.stringify(subscribed));
+    await uploadData(key, JSON.stringify(subscribed));
+    return;
   }
 
   await ensureCacheSubPathExists(cacheSubPath);
