@@ -1,0 +1,8 @@
+# Build context is the workspace root (needed for the root package-lock.json).
+# Paths are relative to the workspace root.
+node_modules
+**/node_modules
+dist
+**/dist
+**/.env
+packages/committee-generator

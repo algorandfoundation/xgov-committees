@@ -61,6 +61,19 @@ describe("watchdog", () => {
       expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ message: error.message }));
     });
 
+    it("wraps a non-Error thrown value in a new Error before calling onFailure", () => {
+      vi.useFakeTimers();
+      // spawnSync throwing a string propagates out of notifySystemd as a non-Error
+      mockSpawnSync.mockImplementation(() => {
+        throw "spawnSync exploded";
+      });
+      const onFailure = vi.fn();
+      const handle = startWatchdog(onFailure);
+      vi.advanceTimersByTime(WATCHDOG_INTERVAL_MS + 1);
+      clearInterval(handle);
+      expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ message: "spawnSync exploded" }));
+    });
+
     it("calls onFailure exactly once even if the interval fires multiple times after failure", () => {
       vi.useFakeTimers();
       mockSpawnSync.mockReturnValue({ error: null, status: 1 } as unknown as ReturnType<typeof spawnSync>);

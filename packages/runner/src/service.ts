@@ -60,8 +60,12 @@ function spawnWriteCache(generatorPath: string, fromBlock: number, toBlock: numb
  */
 export async function waitForBlock(algorand: AlgorandClient, targetRound: number): Promise<void> {
   while (true) {
-    const status = await algorand.client.algod.statusAfterBlock(targetRound - 1).do();
-    if (Number(status.lastRound) >= targetRound) return;
+    try {
+      const status = await algorand.client.algod.statusAfterBlock(targetRound - 1).do();
+      if (Number(status.lastRound) >= targetRound) return;
+    } catch (err) {
+      console.warn(`waitForBlock: algod error, retrying (${err instanceof Error ? err.message : err})`);
+    }
   }
 }
 
@@ -70,7 +74,12 @@ export async function waitForBlock(algorand: AlgorandClient, targetRound: number
  * On tip, waits for block `to + ROUND_BUFFER` before retrying with the same range.
  * Throws if tip is hit twice.
  */
-async function runWriteCache(algorand: AlgorandClient, generatorPath: string, from: number, to: number): Promise<void> {
+export async function runWriteCache(
+  algorand: AlgorandClient,
+  generatorPath: string,
+  from: number,
+  to: number,
+): Promise<void> {
   const result = await spawnWriteCache(generatorPath, from, to);
   if (result === "tip") {
     console.log(`generator reached chain tip, waiting for block ${to + ROUND_BUFFER} then retrying`);
@@ -84,7 +93,7 @@ async function runWriteCache(algorand: AlgorandClient, generatorPath: string, fr
 
 /**
  * Runs the service loop until all run conditions are handled.
- * Re-evaluates after each action in case new run conditions are met (e.g. 100K sync may get close to 1M boundary).
+ * Re-evaluates after each write-cache op in case new boundaries are met (e.g. 100K sync may get close to 1M boundary).
  */
 export async function run(config: Config): Promise<void> {
   const algorand = AlgorandClient.fromConfig({
@@ -100,7 +109,7 @@ export async function run(config: Config): Promise<void> {
 
   while (true) {
     runCounter++;
-    let reRun = false;
+    let wroteCache = false;
     const params = await algorand.client.algod.getTransactionParams().do();
     const genesisHash = Buffer.from(params.genesisHash).toString("base64");
     let currentRound = Number(params.firstValid);
@@ -116,15 +125,18 @@ export async function run(config: Config): Promise<void> {
     console.log(`[#${runCounter}] round ${currentRound}, next to process: ${nextRoundToProcess}`);
 
     if (currentRound <= nextRoundToProcess) {
-      throw new Error(
-        `algod returned round ${currentRound} which is not ahead of the next round to process ${nextRoundToProcess}`,
-      );
+      if (runCounter === 1)
+        throw new Error(
+          `algod returned round ${currentRound} which is not ahead of the next round to process ${nextRoundToProcess}`,
+        );
+      console.log(`caught up at round ${currentRound - 1}, exiting`);
+      break;
     }
 
     if (crossed100KBoundary(nextRoundToProcess, currentRound)) {
       console.log(`100K boundary crossed, write-cache ${nextRoundToProcess}–${currentRound}`);
       await runWriteCache(algorand, config.committeeGeneratorPath, nextRoundToProcess, currentRound);
-      reRun = true;
+      wroteCache = true;
     }
 
     if (closeTo1MBoundary(currentRound)) {
@@ -137,15 +149,14 @@ export async function run(config: Config): Promise<void> {
 
       console.log(`1M boundary crossed, write-cache ${from}–${target}`);
       await runWriteCache(algorand, config.committeeGeneratorPath, from, target);
-      reRun = true;
+      wroteCache = true;
     }
+
+    if (!wroteCache) break;
 
     saveState(config.stateDir, genesisHash, config.registryAppId, {
       lastProcessedRound: currentRound,
       updatedAt: new Date().toISOString(),
     });
-
-    // all caught up, exit
-    if (!reRun) break;
   }
 }
