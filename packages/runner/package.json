@@ -1,5 +1,5 @@
 {
-  "name": "xgov-committee-runner",
+  "name": "xgov-committees-runner",
   "version": "1.0.0",
   "description": "Service runner for xGov automated committee generation",
   "type": "module",
@@ -12,17 +12,21 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run test:unit && npm run test:integration",
+    "test": "npm run test:unit && npm run test:smoke && npm run test:integration",
+    "test:coverage": "vitest run --coverage",
     "test:unit": "bash test/unit/run-unit.sh",
-    "test:integration": "vitest run test/integration"
+    "test:integration": "vitest run test/integration",
+    "test:smoke": "vitest run test/smoke"
   },
   "dependencies": {
+    "@algorandfoundation/algokit-utils": "^9.2.0",
     "dotenv": "^17.3.1"
   },
   "devDependencies": {
     "@types/node": "^24.10.13",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "@vitest/coverage-v8": "^4.0.18"
   }
 }

@@ -44,7 +44,7 @@ ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
 Absolute paths for both the Node binary and compiled entry point (no dependency on PATH). The TypeScript source MUST be compiled to JavaScript during the build step in CI/CD before deployment.
 
 ```ini
-User=xgov-committee-runner
+User=xgov-committees-runner
 ```
 
 Runs as a dedicated unprivileged user, restricting access if the process is compromised.

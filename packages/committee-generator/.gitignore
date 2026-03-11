@@ -3,5 +3,8 @@ dist/
 .env.*.private
 .env
 
+# Default local data directory
+test_data/
+
 # Test runtime files
 test/.localstack-config.json
