@@ -6,7 +6,9 @@ import { loadState, saveState } from "./state.ts";
 import { crossed100KBoundary, closeTo1MBoundary, next1MBoundary } from "./utils.ts";
 
 const ROUND_BUFFER = 21; // ~1m at 2.8s per block
-const REGISTRY_CREATION_ROUND = 52307574; // mainnet tx F6YHCQJJDNXY3ABSTOITQAY3KDVFMAOFIPMHM2HRCOTW72TLUX3Q
+// Creation round of the first mainnet registry app (id 3147789458, tx F6YHCQJJDNXY3ABSTOITQAY3KDVFMAOFIPMHM2HRCOTW72TLUX3Q).
+// Even if a new registry version is deployed in the future, this service calculates committees from the very first governance period in xGov.
+const REGISTRY_CREATION_ROUND = 52307574;
 
 // Mirrors committee-generator's ExitCode
 const GENERATOR_EXIT_CODE = {
