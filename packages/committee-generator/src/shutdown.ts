@@ -79,14 +79,23 @@ const ignoredTypes = new Set(['TIMERWRAP', 'TickObject', 'ELDHISTOGRAM']);
 
 let asyncHookEnabled = false;
 
-// Create async hook to track resources including promises
+// Create async hook to track resources including promises.
+// We track resources regardless of `shuttingDown` so that work scheduled
+// during shutdown is also observed. For PROMISE resources rely on the
+// `promiseResolve` hook because PROMISEs are not always destroyed when
+// they settle.
 const asyncHook = createHook({
   init(asyncId, type, _triggerAsyncId) {
-    if (!shuttingDown && !ignoredTypes.has(type)) {
+    if (!ignoredTypes.has(type)) {
       activeResources.set(asyncId, { type, timestamp: Date.now() });
     }
   },
   destroy(asyncId) {
+    activeResources.delete(asyncId);
+  },
+  // Called when a Promise is resolved or rejected (i.e., settled). Remove promise
+  // entries so we don't rely solely on `destroy` for PROMISE lifecycle.
+  promiseResolve(asyncId) {
     activeResources.delete(asyncId);
   },
 });
@@ -206,4 +215,50 @@ export async function expectedExit(code: number, message: string) {
 export async function fatalError(err: unknown) {
   console.error('Fatal error:', err);
   await shutdown(ExitCode.FATAL, 'fatal');
+}
+
+// ============================================================================
+// Test helpers - only for use in test files
+// ============================================================================
+
+/**
+ * Get the current number of tracked async resources (for testing)
+ * @internal
+ */
+export function __getActiveResourceCount(): number {
+  return activeResources.size;
+}
+
+/**
+ * Get a snapshot of active resource types (for testing)
+ * @internal
+ */
+export function __getActiveResourceTypes(): Map<string, number> {
+  const typeCounts = new Map<string, number>();
+  for (const { type } of activeResources.values()) {
+    typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+  }
+  return typeCounts;
+}
+
+/**
+ * Reset shutdown module state for testing
+ * @internal
+ */
+export function __resetShutdownState(): void {
+  shuttingDown = false;
+  shutdownPromise = null;
+  activeResources.clear();
+  if (asyncHookEnabled) {
+    asyncHook.disable();
+    asyncHookEnabled = false;
+  }
+}
+
+/**
+ * Expose waitForPendingOperations for testing
+ * @internal
+ */
+export async function __waitForPendingOperations(timeoutMs = 30000): Promise<void> {
+  return waitForPendingOperations(timeoutMs);
 }
