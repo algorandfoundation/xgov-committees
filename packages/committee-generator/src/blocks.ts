@@ -113,11 +113,7 @@ const _getBlock = async (rnd: number, skipCache: boolean = false): Promise<Block
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
     // Check if block is not available (404 error from ledger)
-    if (
-      /Network request error\. Received status 404 \(Not Found\): failed to retrieve information from the ledger/.test(
-        errorMessage,
-      )
-    ) {
+    if (errorMessage.includes('failed to retrieve information from the ledger')) {
       throw new TipReachedError(rnd);
     }
 
