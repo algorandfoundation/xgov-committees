@@ -11,7 +11,7 @@ const REGISTRY_CREATION_ROUND = 52307574;
 const FIXTURES = join(import.meta.dirname, "fixtures");
 const RUNNER_ROOT = join(import.meta.dirname, "../..");
 
-describe("runner smoke test", () => {
+describe("runner", () => {
   let fakeBinDir: string; // holds systemd-notify stub, added to PATH
   let stateDir: string;
 
@@ -54,22 +54,41 @@ describe("runner smoke test", () => {
     };
   }
 
-  function runRunner(env: NodeJS.ProcessEnv) {
+  function runRunner(env: NodeJS.ProcessEnv, timeout?: number) {
     return spawnSync("node", ["--import", "tsx/esm", "src/index.ts"], {
       cwd: RUNNER_ROOT,
       encoding: "utf8",
+      timeout,
       env,
     });
   }
 
-  function seedStaleState(dir: string = stateDir) {
-    saveState(dir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
+  function seedStaleState() {
+    saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
       lastProcessedRound: 0,
       updatedAt: new Date().toISOString(),
     });
   }
 
-  it("bootstraps from round REGISTRY_CREATION_ROUND when no state file exists", () => {
+  function waitForPid(pidFile: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const poll = setInterval(() => {
+        try {
+          resolve(parseInt(readFileSync(pidFile, "utf8")));
+          clearInterval(poll);
+          clearTimeout(timeout);
+        } catch {
+          /* not yet */
+        }
+      }, 50);
+      const timeout = setTimeout(() => {
+        clearInterval(poll);
+        reject(new Error("timed out waiting for generator PID file"));
+      }, 10_000);
+    });
+  }
+
+  it("bootstraps state from registry creation round when no state file exists", () => {
     const freshDir = mkdtempSync(join(tmpdir(), "runner-bootstrap-"));
     try {
       const result = runRunner({
@@ -88,26 +107,45 @@ describe("runner smoke test", () => {
     }
   });
 
-  it("starts and exits 0 with expected output", () => {
+  it("exits 0 with startup banner when no boundary is crossed", () => {
     const result = runRunner(baseEnv());
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain("Runner started successfully");
   });
 
-  it("respects env overrides in the startup banner", () => {
-    // run() will fail (unreachable algod) — only assert on stdout, not exit code.
+  it("run() error exits with code 1", () => {
     const result = runRunner({
       ...baseEnv(),
-      ALGOD_SERVER: "https://custom-node.example.com",
-      ALGOD_PORT: "8443",
-      REGISTRY_APP_ID: "999",
+      ALGOD_SERVER: "https://nonexistent.example.invalid",
+      ALGOD_PORT: "9999",
     });
-    expect(result.stdout).toContain("https://custom-node.example.com:8443");
-    expect(result.stdout).toContain("999");
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("run() failed");
   });
 
-  it("exits 0 on SIGTERM while generator is running and does not orphan child", { timeout: 30_000 }, async () => {
+  it("escalates to SIGKILL after grace period when generator ignores SIGTERM", { timeout: 20_000 }, async () => {
+    const pidFile = join(stateDir, "stubborn.pid");
+    seedStaleState();
+
+    const runner = spawn("node", ["--import", "tsx/esm", "src/index.ts"], {
+      cwd: RUNNER_ROOT,
+      env: {
+        ...baseEnv(),
+        COMMITTEE_GENERATOR_PATH: join(FIXTURES, "sigterm-ignoring-generator.mjs"),
+        PID_FILE: pidFile,
+      },
+    });
+
+    const childPid = await waitForPid(pidFile);
+    runner.kill("SIGTERM");
+    const exitCode = await new Promise<number | null>((resolve) => runner.on("close", (code) => resolve(code)));
+
+    expect(exitCode).toBe(0);
+    expect(() => process.kill(childPid, 0)).toThrow(); // child was killed, not orphaned
+  });
+
+  it("exits 0 on SIGTERM and does not orphan the generator", { timeout: 30_000 }, async () => {
     const pidFile = join(stateDir, "generator.pid");
     seedStaleState();
 
@@ -120,22 +158,7 @@ describe("runner smoke test", () => {
       },
     });
 
-    const childPid = await new Promise<number>((resolve, reject) => {
-      const poll = setInterval(() => {
-        try {
-          resolve(parseInt(readFileSync(pidFile, "utf8")));
-          clearInterval(poll);
-          clearTimeout(timeout);
-        } catch {
-          /* not yet */
-        }
-      }, 50);
-      const timeout = setTimeout(() => {
-        clearInterval(poll);
-        reject(new Error("timed out waiting for generator PID file"));
-      }, 10_000);
-    });
-
+    const childPid = await waitForPid(pidFile);
     runner.kill("SIGTERM");
     const exitCode = await new Promise<number | null>((resolve) => runner.on("close", (code) => resolve(code)));
 
