@@ -10,4 +10,6 @@ WorkingDirectory=/opt/xgov-committees/packages/runner
 ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
 WatchdogSec=65
 WatchdogSignal=SIGTERM
+RuntimeMaxSec=3h
+TimeoutStopSec=90
 User=xgov-committees-runner
