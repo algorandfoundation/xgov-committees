@@ -61,6 +61,29 @@ describe("waitForBlock", () => {
     await waitForBlock(makeAlgorandClient(statusAfterBlock), 1000);
     expect(statusAfterBlock).toHaveBeenCalledTimes(2);
   });
+
+  it("retries and warns when algod throws, covering both Error and non-Error thrown values", async () => {
+    const statusAfterBlock = vi
+      .fn()
+      .mockImplementationOnce(() => ({
+        do: async () => {
+          throw "string error";
+        },
+      }))
+      .mockImplementationOnce(() => ({
+        do: async () => {
+          throw new Error("connection reset");
+        },
+      }))
+      .mockReturnValueOnce({ do: async () => ({ lastRound: BigInt(1000) }) });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await waitForBlock(makeAlgorandClient(statusAfterBlock), 1000);
+    expect(statusAfterBlock).toHaveBeenCalledTimes(3);
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("string error"));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("connection reset"));
+    warnSpy.mockRestore();
+  });
 });
 
 describe("runWriteCache", () => {
