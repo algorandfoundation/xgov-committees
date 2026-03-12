@@ -38,7 +38,7 @@ vi.mock('../src/shutdown', () => ({
   ExitCode: {
     SUCCESS: 0,
     EXPECTED_TIP: 10,
-    FATAL_ERROR: 1,
+    FATAL: 1,
   },
   expectedExit: vi.fn(),
   fatalError: vi.fn(),
@@ -132,6 +132,9 @@ describe('TipReachedError Integration Test', () => {
   });
 
   it('should verify TipReachedError is caught by index.ts error handler', async () => {
+    // we expect 3 assertions in this test: error type, block number, and message content (trycatch catch block)
+    expect.assertions(3);
+
     const { getCache, subtractCached } = await import('../src/cache');
     const { algod } = await import('../src/algod');
     const { runWriteCache } = await import('../src/modes/write-cache');

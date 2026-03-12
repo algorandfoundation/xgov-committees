@@ -218,47 +218,26 @@ export async function fatalError(err: unknown) {
 }
 
 // ============================================================================
-// Test helpers - only for use in test files
+// Internal API for test helpers - caution: only for test use
 // ============================================================================
 
-/**
- * Get the current number of tracked async resources (for testing)
- * @internal
- */
-export function __getActiveResourceCount(): number {
-  return activeResources.size;
-}
-
-/**
- * Get a snapshot of active resource types (for testing)
- * @internal
- */
-export function __getActiveResourceTypes(): Map<string, number> {
-  const typeCounts = new Map<string, number>();
-  for (const { type } of activeResources.values()) {
-    typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
-  }
-  return typeCounts;
-}
-
-/**
- * Reset shutdown module state for testing
- * @internal
- */
-export function __resetShutdownState(): void {
-  shuttingDown = false;
-  shutdownPromise = null;
-  activeResources.clear();
-  if (asyncHookEnabled) {
-    asyncHook.disable();
-    asyncHookEnabled = false;
-  }
-}
-
-/**
- * Expose waitForPendingOperations for testing
- * @internal
- */
-export async function __waitForPendingOperations(timeoutMs = 30000): Promise<void> {
-  return waitForPendingOperations(timeoutMs);
-}
+export const __testInternals = {
+  getActiveResourceCount: () => activeResources.size,
+  getActiveResourceTypes: () => {
+    const typeCounts = new Map<string, number>();
+    for (const { type } of activeResources.values()) {
+      typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+    }
+    return typeCounts;
+  },
+  resetShutdownState: () => {
+    shuttingDown = false;
+    shutdownPromise = null;
+    activeResources.clear();
+    if (asyncHookEnabled) {
+      asyncHook.disable();
+      asyncHookEnabled = false;
+    }
+  },
+  waitForPendingOperations: (timeoutMs = 30000) => waitForPendingOperations(timeoutMs),
+};

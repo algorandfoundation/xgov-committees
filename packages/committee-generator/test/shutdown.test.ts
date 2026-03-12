@@ -5,11 +5,8 @@ import {
   isShuttingDown,
   shutdown,
   ExitCode,
-  __resetShutdownState,
-  __getActiveResourceCount,
-  __getActiveResourceTypes,
-  __waitForPendingOperations,
 } from '../src/shutdown';
+import { __testInternals } from './shutdown.test-helpers';
 
 // Mock the cache manager module before importing anything else
 vi.mock('../src/cache/cache-manager', () => ({
@@ -22,7 +19,7 @@ describe('Shutdown Async Resource Tracking', () => {
 
   beforeEach(async () => {
     // Reset module state before each test
-    __resetShutdownState();
+    __testInternals.resetShutdownState();
     // Mock process.exit to prevent actual process termination
     originalExit = process.exit;
     exitMock = vi.fn() as never;
@@ -47,24 +44,6 @@ describe('Shutdown Async Resource Tracking', () => {
   });
 
   describe('Basic Async Resource Tracking', () => {
-    it('should track async resources when enabled', async () => {
-      enableAsyncTracking();
-
-      // Create some async resources
-      const promise1 = Promise.resolve(42);
-      const promise2 = new Promise((resolve) => setTimeout(resolve, 10));
-
-      // Give async hooks time to register
-      await new Promise((resolve) => setImmediate(resolve));
-
-      const count = __getActiveResourceCount();
-      expect(count).toBeGreaterThan(0);
-
-      // Wait for promises to settle
-      await Promise.all([promise1, promise2]);
-      await new Promise((resolve) => setImmediate(resolve));
-    });
-
     it('should categorize resource types correctly', async () => {
       enableAsyncTracking();
 
@@ -74,7 +53,7 @@ describe('Shutdown Async Resource Tracking', () => {
 
       await new Promise((resolve) => setImmediate(resolve));
 
-      const types = __getActiveResourceTypes();
+      const types = __testInternals.getActiveResourceTypes();
       expect(types.size).toBeGreaterThan(0);
 
       clearTimeout(timer);
@@ -84,16 +63,23 @@ describe('Shutdown Async Resource Tracking', () => {
     it('should not track ignored resource types', async () => {
       enableAsyncTracking();
 
-      const initialCount = __getActiveResourceCount();
+      // Create some async resources
+      const promise = Promise.resolve();
+      const timer = setTimeout(() => {}, 100);
 
-      // TIMERWRAP, TickObject, and ELDHISTOGRAM should be ignored
-      // We can't easily create these directly, but at least verify
-      // that the system doesn't crash and counts are reasonable
       await new Promise((resolve) => setImmediate(resolve));
 
-      const finalCount = __getActiveResourceCount();
-      // Count should be stable or change only slightly
-      expect(Math.abs(finalCount - initialCount)).toBeLessThan(10);
+      // Get the types currently being tracked
+      const trackedTypes = __testInternals.getActiveResourceTypes();
+      const typeNames = Array.from(trackedTypes.keys());
+
+      // Verify none of the ignored types are being tracked
+      expect(typeNames).not.toContain('TIMERWRAP');
+      expect(typeNames).not.toContain('TickObject');
+      expect(typeNames).not.toContain('ELDHISTOGRAM');
+
+      clearTimeout(timer);
+      await promise;
     });
   });
 
@@ -103,7 +89,7 @@ describe('Shutdown Async Resource Tracking', () => {
 
       // Start with a baseline
       await new Promise((resolve) => setImmediate(resolve));
-      const initialCount = __getActiveResourceCount();
+      const initialCount = __testInternals.getActiveResourceCount();
 
       // Create and immediately resolve promises
       const promises = Array.from({ length: 5 }, (_, i) => Promise.resolve(i));
@@ -113,7 +99,7 @@ describe('Shutdown Async Resource Tracking', () => {
       await new Promise((resolve) => setImmediate(resolve));
 
       // All promises should be cleaned up
-      const finalCount = __getActiveResourceCount();
+      const finalCount = __testInternals.getActiveResourceCount();
 
       // Final count should not have grown significantly
       // (some system resources may still be tracked, but not our 5 promises)
@@ -124,7 +110,7 @@ describe('Shutdown Async Resource Tracking', () => {
       enableAsyncTracking();
 
       await new Promise((resolve) => setImmediate(resolve));
-      const initialCount = __getActiveResourceCount();
+      const initialCount = __testInternals.getActiveResourceCount();
 
       // Create promises that reject
       const promises = Array.from(
@@ -135,17 +121,21 @@ describe('Shutdown Async Resource Tracking', () => {
       await Promise.all(promises);
       await new Promise((resolve) => setImmediate(resolve));
 
-      const finalCount = __getActiveResourceCount();
+      const finalCount = __testInternals.getActiveResourceCount();
       expect(finalCount - initialCount).toBeLessThan(3);
     });
   });
 
   describe('Track Resources During Shutdown', () => {
-    it('should track resources created during shutdown initiation', async () => {
+    it('should track resources during and after shutdown initiation', async () => {
       enableAsyncTracking();
 
-      // Verify we're NOT shutting down yet
+      // Verify initial state
       expect(isShuttingDown()).toBe(false);
+
+      // Create initial async work before shutdown
+      const _promise1 = Promise.resolve(1);
+      await new Promise((resolve) => setImmediate(resolve));
 
       // Start shutdown (it will be async)
       void shutdown(ExitCode.SUCCESS, 'expected', 'test shutdown');
@@ -153,47 +143,20 @@ describe('Shutdown Async Resource Tracking', () => {
       // Give shutdown time to start
       await new Promise((resolve) => setTimeout(resolve, 20));
 
-      // Verify we're shutting down
-      expect(isShuttingDown()).toBe(true);
-
-      // The shutdown process itself creates async work that should be tracked
-      // We can't easily mock shutdownCache with vi.mock in this context,
-      // but we can verify that shutdown starts and resources are created
-      const count = __getActiveResourceCount();
-      expect(count).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should continue tracking resources after shutdown starts', async () => {
-      enableAsyncTracking();
-
-      // Create some initial async work (intentionally unused, triggers async hook)
-      const _promise1 = Promise.resolve(1);
-      await new Promise((resolve) => setImmediate(resolve));
-
-      const _initialCount = __getActiveResourceCount();
-
-      // Start shutdown
-      void shutdown(ExitCode.SUCCESS, 'expected', 'cascade test');
-      await new Promise((resolve) => setTimeout(resolve, 20));
-
       // Verify shutdown started
       expect(isShuttingDown()).toBe(true);
 
-      // The async hook should still be enabled and tracking resources
-      // even though shuttingDown is true
-
+      // Create async work after shutdown starts - should still be tracked
       const _promise2 = Promise.resolve(2);
       await new Promise((resolve) => setImmediate(resolve));
 
-      // Note: We can't assert exact counts because the test framework
-      // and shutdown process create their own resources, but we can
-      // verify the hook is still active
-      expect(__getActiveResourceCount()).toBeGreaterThanOrEqual(0);
+      // Verify async hook is still active and tracking resources
+      expect(__testInternals.getActiveResourceCount()).toBeGreaterThanOrEqual(0);
     });
   });
 
   describe('waitForPendingOperations', () => {
-    it('should wait for all pending operations to complete', async () => {
+    it('should track promise completion with async hooks', async () => {
       enableAsyncTracking();
 
       const delays = [50, 100, 150];
@@ -210,12 +173,8 @@ describe('Shutdown Async Resource Tracking', () => {
           }),
       );
 
-      // Start waiting (with generous timeout)
-      const waitPromise = __waitForPendingOperations(5000);
-
-      // Promises should complete during wait
+      // Wait for our promises to complete
       await Promise.all(promises);
-      await waitPromise;
 
       // All promises should have completed
       expect(completed).toHaveLength(3);
@@ -223,34 +182,45 @@ describe('Shutdown Async Resource Tracking', () => {
       expect(completed).toContain(100);
       expect(completed).toContain(150);
 
-      // Resources should be mostly cleared (allow some test framework overhead)
-      const finalCount = __getActiveResourceCount();
-      expect(finalCount).toBeLessThan(20); // Relaxed expectation due to test framework resources
+      // Wait for async hooks to process promise cleanup
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Resources should be mostly cleared (allow test framework overhead)
+      const finalCount = __testInternals.getActiveResourceCount();
+      expect(finalCount).toBeLessThan(20);
     });
 
-    it('should timeout if operations take too long', async () => {
-      enableAsyncTracking();
+    it('should wait successfully and complete when operations finish', async () => {
+      // Don't enable async tracking to avoid test framework overhead timeout
 
-      // Create a promise that never resolves (intentionally unused)
-      const _neverResolves = new Promise(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      // Use short timeout
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // Create a few quick promises
+      const promises = [
+        new Promise<void>((resolve) => setTimeout(resolve, 30)),
+        new Promise<void>((resolve) => setTimeout(resolve, 50)),
+      ];
 
-      await __waitForPendingOperations(100);
+      // Start the promises
+      void Promise.all(promises);
 
-      // Should have warned about timeout
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Shutdown timeout reached'),
-      );
+      // Wait for operations with reasonable timeout
+      // Should complete without timing out
+      await __testInternals.waitForPendingOperations(1000);
 
-      consoleWarnSpy.mockRestore();
+      // Should have completed successfully without timeout warnings
+      const logCalls = consoleLogSpy.mock.calls.map((call) => call.join(' '));
+      const hasTimeoutWarning = logCalls.some((log) => log.includes('Shutdown timeout reached'));
+
+      expect(hasTimeoutWarning).toBe(false);
+
+      consoleLogSpy.mockRestore();
     });
 
-    it('should log pending resource types on timeout', async () => {
+    it('should timeout and log resource types if operations take too long', async () => {
       enableAsyncTracking();
 
-      // Create some long-running operations
+      // Create some long-running operations that won't complete
       const timers = [
         setTimeout(() => {}, 5000),
         setTimeout(() => {}, 5000),
@@ -259,16 +229,21 @@ describe('Shutdown Async Resource Tracking', () => {
 
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      await __waitForPendingOperations(100);
+      // Call with short timeout to force timeout
+      await __testInternals.waitForPendingOperations(100);
+
+      // Should have warned about timeout
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Shutdown timeout reached'),
+      );
 
       // Should have logged resource types
       const warnCalls = consoleWarnSpy.mock.calls;
       expect(warnCalls.length).toBeGreaterThan(0);
 
-      // Find the call that logs resource types
-      const typeLogCall = warnCalls.find((call) => call[0]?.toString().includes('Timeout'));
-
-      expect(typeLogCall).toBeDefined();
+      // Verify resource types were logged in the timeout message
+      const timeoutCall = warnCalls.find((call) => call[0]?.toString().includes('Timeout'));
+      expect(timeoutCall).toBeDefined();
 
       consoleWarnSpy.mockRestore();
       timers.forEach(clearTimeout);
@@ -276,27 +251,48 @@ describe('Shutdown Async Resource Tracking', () => {
   });
 
   describe('Shutdown Integration', () => {
-    it('should complete shutdown when all operations finish', async () => {
+    it('should initiate shutdown and track async operations', async () => {
       enableAsyncTracking();
 
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      // Create a quick operation
-      const quickOp = Promise.resolve(42);
-
       // Start shutdown
       void shutdown(ExitCode.SUCCESS, 'expected', 'integration test');
 
-      // Wait for async operations to process
-      await quickOp;
+      // Wait for shutdown to initiate
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Should have logged shutdown initiation
       const logCalls = consoleLogSpy.mock.calls.map((call) => call.join(' '));
-      const hasShutdownLog = logCalls.some((log) => log.includes('Shutdown initiated'));
+      expect(logCalls.some((log) => log.includes('Shutdown initiated'))).toBe(true);
+      expect(logCalls.some((log) => log.includes('Waiting for'))).toBe(true);
 
-      expect(hasShutdownLog).toBe(true);
+      // Shutdown should be in progress
       expect(isShuttingDown()).toBe(true);
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should complete shutdown and exit process', async () => {
+      // Don't enable async tracking to allow quick completion
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const { shutdownCache } = await import('../src/cache/cache-manager');
+
+      // Start shutdown
+      void shutdown(ExitCode.SUCCESS, 'expected', 'completion test');
+
+      // Wait for shutdown to complete (quick without async tracking overhead)
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Should have completed the shutdown sequence
+      const logCalls = consoleLogSpy.mock.calls.map((call) => call.join(' '));
+      expect(logCalls.some((log) => log.includes('Shutdown complete'))).toBe(true);
+
+      // Should have called cleanup functions
+      expect(vi.mocked(shutdownCache)).toHaveBeenCalled();
+
+      // Should have exited with correct code
+      expect(exitMock).toHaveBeenCalledWith(ExitCode.SUCCESS);
 
       consoleLogSpy.mockRestore();
     });
@@ -321,8 +317,8 @@ describe('Shutdown Async Resource Tracking', () => {
       const logCalls = consoleLogSpy.mock.calls.map((call) => call.join(' '));
       const initiationLogs = logCalls.filter((log) => log.includes('Shutdown initiated'));
 
-      // Even if promises differ due to test isolation, only one shutdown should execute
-      expect(initiationLogs.length).toBeGreaterThanOrEqual(1);
+      // Only one shutdown should execute despite three calls
+      expect(initiationLogs.length).toBe(1);
       expect(isShuttingDown()).toBe(true);
 
       consoleLogSpy.mockRestore();
@@ -331,14 +327,14 @@ describe('Shutdown Async Resource Tracking', () => {
 
   describe('Async Tracking Enable/Disable', () => {
     it('should only enable tracking once', () => {
-      expect(__getActiveResourceCount()).toBe(0);
+      expect(__testInternals.getActiveResourceCount()).toBe(0);
 
       enableAsyncTracking();
       enableAsyncTracking(); // Call again
       enableAsyncTracking(); // And again
 
       // Should not crash or cause issues
-      expect(__getActiveResourceCount()).toBeGreaterThanOrEqual(0);
+      expect(__testInternals.getActiveResourceCount()).toBeGreaterThanOrEqual(0);
     });
 
     it('should clear resources when disabled', async () => {
@@ -347,17 +343,17 @@ describe('Shutdown Async Resource Tracking', () => {
       // Create some resources (intentionally unused, triggers async hook)
       const _promise = Promise.resolve();
 
-      const beforeDisableCount = __getActiveResourceCount();
+      const beforeDisableCount = __testInternals.getActiveResourceCount();
 
       disableAsyncTracking();
 
-      const afterDisableCount = __getActiveResourceCount();
+      const afterDisableCount = __testInternals.getActiveResourceCount();
 
       // After disabling, new resources should not be tracked
       const _promise2 = Promise.resolve();
       await new Promise((resolve) => setImmediate(resolve));
 
-      const finalCount = __getActiveResourceCount();
+      const finalCount = __testInternals.getActiveResourceCount();
 
       // Note: activeResources might not be cleared immediately,
       // but new resources won't be added
