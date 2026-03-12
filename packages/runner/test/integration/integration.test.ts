@@ -166,3 +166,52 @@ describe("runner", () => {
     expect(() => process.kill(childPid, 0)).toThrow(); // child was killed, not orphaned
   });
 });
+
+describe("notify-slack", () => {
+  const NOTIFY_SCRIPT = join(RUNNER_ROOT, "dist", "notify-slack.js");
+
+  it("exits 0 silently when service-result is success", () => {
+    const result = spawnSync(
+      "node",
+      [NOTIFY_SCRIPT, "--exit-status", "0", "--service-result", "success", "--hostname", "test"],
+      { encoding: "utf8" },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+  });
+
+  it("exits 1 when Slack env vars are missing and service-result is not success", () => {
+    const result = spawnSync(
+      "node",
+      [NOTIFY_SCRIPT, "--exit-status", "1", "--service-result", "exit-code", "--hostname", "test"],
+      { encoding: "utf8", env: { ...process.env, SLACK_BOT_TOKEN: "", SLACK_CHANNEL_ID: "" } },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Missing required env vars");
+  });
+
+  it("exits 1 when required args are missing", () => {
+    const result = spawnSync("node", [NOTIFY_SCRIPT], { encoding: "utf8" });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Missing required argument");
+  });
+
+  const hasSlackCreds = !!(process.env.SLACK_BOT_TOKEN && process.env.SLACK_CHANNEL_ID);
+
+  it.skipIf(!hasSlackCreds)("exits 0 with valid Slack credentials", () => {
+    const result = spawnSync(
+      "node",
+      [NOTIFY_SCRIPT, "--exit-status", "1", "--service-result", "exit-code", "--hostname", "integration-test"],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
+          SLACK_CHANNEL_ID: process.env.SLACK_CHANNEL_ID,
+        },
+      },
+    );
+    expect(result.status).toBe(0);
+  });
+});
