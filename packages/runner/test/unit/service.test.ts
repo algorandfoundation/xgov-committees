@@ -22,7 +22,7 @@ const mockFromConfig = vi.mocked(AlgorandClient.fromConfig);
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const ROUND_BUFFER = 21;
-const REGISTRY_CREATION_ROUND = 52307574;
+const FIRST_SYNC_ROUND = 50_000_000;
 
 function makeChildProcess(exitCode: number | null = 0, signal: string | null = null) {
   const emitter = new EventEmitter() as ChildProcess;
@@ -36,6 +36,13 @@ function makeAlgorandClient(statusAfterBlock: Mock): AlgorandClient {
 }
 
 describe("waitForBlock", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("resolves in one call when the chain is already at the target round", async () => {
     const statusAfterBlock = vi.fn().mockReturnValue({
       do: async () => ({ lastRound: BigInt(1000) }),
@@ -76,13 +83,11 @@ describe("waitForBlock", () => {
         },
       }))
       .mockReturnValueOnce({ do: async () => ({ lastRound: BigInt(1000) }) });
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     await waitForBlock(makeAlgorandClient(statusAfterBlock), 1000);
     expect(statusAfterBlock).toHaveBeenCalledTimes(3);
-    expect(warnSpy).toHaveBeenCalledTimes(2);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("string error"));
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("connection reset"));
-    warnSpy.mockRestore();
+    expect(vi.mocked(console.warn)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(console.warn)).toHaveBeenCalledWith(expect.stringContaining("string error"));
+    expect(vi.mocked(console.warn)).toHaveBeenCalledWith(expect.stringContaining("connection reset"));
   });
 });
 
@@ -457,7 +462,7 @@ describe("run", () => {
     await expect(run(makeConfig())).rejects.toThrow("generator reached chain tip even after retrying");
   });
 
-  it("bootstraps from REGISTRY_CREATION_ROUND when no state file exists", async () => {
+  it("bootstraps from FIRST_SYNC_ROUND when no state file exists", async () => {
     const { algorand } = makeRunAlgorand(58_000_042n);
     mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
     mockLoadState.mockReturnValueOnce(null).mockReturnValueOnce({ lastProcessedRound: 58_000_042, updatedAt: "" });
@@ -478,7 +483,7 @@ describe("run", () => {
         "--mode",
         "write-cache",
         "--from-block",
-        String(REGISTRY_CREATION_ROUND),
+        String(FIRST_SYNC_ROUND),
         "--to-block",
         "58000042",
       ],
@@ -491,7 +496,7 @@ describe("run", () => {
       999,
       expect.objectContaining({ lastProcessedRound: 58_000_042 }),
     );
-    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining(String(REGISTRY_CREATION_ROUND)));
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining(String(FIRST_SYNC_ROUND)));
   });
 
   it("throws on first iteration when algod round is not ahead of the next round to process", async () => {

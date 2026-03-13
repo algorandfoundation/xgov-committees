@@ -3,5 +3,5 @@
 // and verifies the runner exits cleanly without orphaning this process.
 import { writeFileSync } from "node:fs";
 
-writeFileSync(process.env.PID_FILE, String(process.pid));
+if (process.env.PID_FILE) writeFileSync(process.env.PID_FILE, String(process.pid));
 setTimeout(() => process.exit(0), 60_000);

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // config.ts reads process.env at module-load time (via dotenv + direct access).
 // Each test uses vi.doMock + vi.resetModules + dynamic import for isolation.
@@ -13,7 +13,20 @@ const CONFIG_KEYS = [
 ] as const;
 
 describe("config env var branches", () => {
+  let savedEnv: Partial<Record<string, string>>;
+
+  beforeEach(() => {
+    savedEnv = {};
+    for (const k of CONFIG_KEYS) {
+      savedEnv[k] = process.env[k];
+    }
+  });
+
   afterEach(() => {
+    for (const k of CONFIG_KEYS) {
+      if (savedEnv[k] !== undefined) process.env[k] = savedEnv[k];
+      else delete process.env[k];
+    }
     vi.doUnmock("dotenv");
     vi.resetModules();
   });
@@ -23,25 +36,15 @@ describe("config env var branches", () => {
     vi.doMock("dotenv", () => ({ default: { config: vi.fn() } }));
     vi.resetModules();
 
-    const saved: Partial<Record<string, string>> = {};
-    for (const k of CONFIG_KEYS) {
-      saved[k] = process.env[k];
-      delete process.env[k];
-    }
-    try {
-      const { config } = await import("../../src/config.ts");
-      expect(config.algodServer).toBe("https://mainnet-api.4160.nodely.dev");
-      expect(config.algodPort).toBe(443);
-      expect(config.algodToken).toBe("");
-      expect(config.registryAppId).toBe(3147789458);
-      expect(config.stateDir).toBe("/var/lib/xgov-committees-runner");
-      expect(config.committeeGeneratorPath).toBe("/opt/xgov-committees/packages/committee-generator/dist/index.js");
-    } finally {
-      for (const k of CONFIG_KEYS) {
-        if (saved[k] !== undefined) process.env[k] = saved[k];
-        else delete process.env[k];
-      }
-    }
+    for (const k of CONFIG_KEYS) delete process.env[k];
+
+    const { config } = await import("../../src/config.ts");
+    expect(config.algodServer).toBe("https://mainnet-api.4160.nodely.dev");
+    expect(config.algodPort).toBe(443);
+    expect(config.algodToken).toBe("");
+    expect(config.registryAppId).toBe(3147789458);
+    expect(config.stateDir).toBe("/var/lib/xgov-committees-runner");
+    expect(config.committeeGeneratorPath).toBe("/opt/xgov-committees/packages/committee-generator/dist/index.js");
   });
 
   it("reads all values from env vars when they are set", async () => {
@@ -53,16 +56,13 @@ describe("config env var branches", () => {
     process.env.COMMITTEE_GENERATOR_PATH = "/custom/generator.js";
 
     vi.resetModules();
-    try {
-      const { config } = await import("../../src/config.ts");
-      expect(config.algodServer).toBe("https://custom.example.com");
-      expect(config.algodPort).toBe(8443);
-      expect(config.algodToken).toBe("my-token");
-      expect(config.registryAppId).toBe(12345);
-      expect(config.stateDir).toBe("/custom/state");
-      expect(config.committeeGeneratorPath).toBe("/custom/generator.js");
-    } finally {
-      for (const k of CONFIG_KEYS) delete process.env[k];
-    }
+
+    const { config } = await import("../../src/config.ts");
+    expect(config.algodServer).toBe("https://custom.example.com");
+    expect(config.algodPort).toBe(8443);
+    expect(config.algodToken).toBe("my-token");
+    expect(config.registryAppId).toBe(12345);
+    expect(config.stateDir).toBe("/custom/state");
+    expect(config.committeeGeneratorPath).toBe("/custom/generator.js");
   });
 });

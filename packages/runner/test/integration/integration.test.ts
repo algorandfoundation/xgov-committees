@@ -7,8 +7,8 @@ import { saveState } from "../../src/state.ts";
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const REGISTRY_APP_ID = 3147789458;
-const REGISTRY_CREATION_ROUND = 52307574;
-const FIXTURES = join(import.meta.dirname, "fixtures");
+const FIRST_SYNC_ROUND = 50_000_000;
+const FIXTURES = join(import.meta.dirname, "../fixtures");
 const RUNNER_ROOT = join(import.meta.dirname, "../..");
 
 describe("runner", () => {
@@ -22,11 +22,13 @@ describe("runner", () => {
     chmodSync(fakeNotify, 0o755);
 
     stateDir = mkdtempSync(join(tmpdir(), "runner-state-"));
+    const algodServer = process.env.ALGOD_SERVER ?? "https://mainnet-api.4160.nodely.dev";
+    const algodPort = process.env.ALGOD_PORT ?? "443";
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), 10_000);
     let resp: Response;
     try {
-      resp = await fetch("https://mainnet-api.4160.nodely.dev/v2/transactions/params", {
+      resp = await fetch(`${algodServer}:${algodPort}/v2/transactions/params`, {
         signal: abort.signal,
       });
     } finally {
@@ -50,7 +52,7 @@ describe("runner", () => {
       ...process.env,
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       STATE_DIR: stateDir,
-      COMMITTEE_GENERATOR_PATH: join(FIXTURES, "committee-generator.js"),
+      COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-default.js"),
     };
   }
 
@@ -68,6 +70,22 @@ describe("runner", () => {
       lastProcessedRound: 0,
       updatedAt: new Date().toISOString(),
     });
+  }
+
+  function spawnRunner(env: NodeJS.ProcessEnv) {
+    const child = spawn("node", ["--import", "tsx/esm", "src/index.ts"], {
+      cwd: RUNNER_ROOT,
+      env,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d: Buffer) => (stdout += d));
+    child.stderr.on("data", (d: Buffer) => (stderr += d));
+    const done = new Promise<{ exitCode: number | null; stdout: string; stderr: string }>((resolve) =>
+      child.on("close", (code) => resolve({ exitCode: code, stdout, stderr })),
+    );
+    return { child, done };
   }
 
   function waitForPid(pidFile: string): Promise<number> {
@@ -94,10 +112,10 @@ describe("runner", () => {
       const result = runRunner({
         ...baseEnv(),
         STATE_DIR: freshDir,
-        COMMITTEE_GENERATOR_PATH: join(FIXTURES, "instant-generator.js"),
+        COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-instant-exit.js"),
       });
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain(`bootstrapping from round ${REGISTRY_CREATION_ROUND}`);
+      expect(result.stdout).toContain(`bootstrapping from round ${FIRST_SYNC_ROUND}`);
       const stateFiles = readdirSync(freshDir).filter((f) => f.endsWith(".json"));
       expect(stateFiles).toHaveLength(1);
       const state = JSON.parse(readFileSync(join(freshDir, stateFiles[0]), "utf8"));
@@ -114,7 +132,7 @@ describe("runner", () => {
     expect(result.stdout).toContain("Runner started successfully");
   });
 
-  it("run() error exits with code 1", () => {
+  it("run() error exits with code 1 when algod is unreachable", () => {
     const result = runRunner({
       ...baseEnv(),
       ALGOD_SERVER: "https://nonexistent.example.invalid",
@@ -124,24 +142,33 @@ describe("runner", () => {
     expect(result.stdout).toContain("run() failed");
   });
 
-  it("escalates to SIGKILL after grace period when generator ignores SIGTERM", { timeout: 20_000 }, async () => {
+  it("exits with code 1 when generator fails with a fatal error", () => {
+    seedStaleState();
+    const result = runRunner({
+      ...baseEnv(),
+      COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-fatal.js"),
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("run() failed");
+    expect(result.stdout).toContain("fatal error");
+  });
+
+  it("escalates to SIGKILL after grace period when generator ignores SIGTERM", { timeout: 50_000 }, async () => {
     const pidFile = join(stateDir, "stubborn.pid");
     seedStaleState();
 
-    const runner = spawn("node", ["--import", "tsx/esm", "src/index.ts"], {
-      cwd: RUNNER_ROOT,
-      env: {
-        ...baseEnv(),
-        COMMITTEE_GENERATOR_PATH: join(FIXTURES, "sigterm-ignoring-generator.mjs"),
-        PID_FILE: pidFile,
-      },
+    const { child: runner, done } = spawnRunner({
+      ...baseEnv(),
+      COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-sigterm-ignoring.mjs"),
+      PID_FILE: pidFile,
     });
 
     const childPid = await waitForPid(pidFile);
     runner.kill("SIGTERM");
-    const exitCode = await new Promise<number | null>((resolve) => runner.on("close", (code) => resolve(code)));
+    const { exitCode, stdout } = await done;
 
     expect(exitCode).toBe(0);
+    expect(stdout).toContain("Shutting down (SIGTERM)");
     expect(() => process.kill(childPid, 0)).toThrow(); // child was killed, not orphaned
   });
 
@@ -149,20 +176,18 @@ describe("runner", () => {
     const pidFile = join(stateDir, "generator.pid");
     seedStaleState();
 
-    const runner = spawn("node", ["--import", "tsx/esm", "src/index.ts"], {
-      cwd: RUNNER_ROOT,
-      env: {
-        ...baseEnv(),
-        COMMITTEE_GENERATOR_PATH: join(FIXTURES, "slow-generator.mjs"),
-        PID_FILE: pidFile,
-      },
+    const { child: runner, done } = spawnRunner({
+      ...baseEnv(),
+      COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-graceful-exit.mjs"),
+      PID_FILE: pidFile,
     });
 
     const childPid = await waitForPid(pidFile);
     runner.kill("SIGTERM");
-    const exitCode = await new Promise<number | null>((resolve) => runner.on("close", (code) => resolve(code)));
+    const { exitCode, stdout } = await done;
 
     expect(exitCode).toBe(0);
+    expect(stdout).toContain("Shutting down (SIGTERM)");
     expect(() => process.kill(childPid, 0)).toThrow(); // child was killed, not orphaned
   });
 });

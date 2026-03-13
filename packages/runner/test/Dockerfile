@@ -24,8 +24,8 @@ COPY packages/runner/ .
 FROM base AS unit-test
 CMD ["node_modules/.bin/vitest", "run", "test/unit"]
 
-# ── integration ───────────────────────────────────────────────────────────────
-FROM base AS integration
+# ── systemd-integration ──────────────────────────────────────────────────────
+FROM base AS systemd-integration
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends systemd-sysv \
@@ -34,11 +34,11 @@ RUN apt-get update \
 RUN npm run build
 
 # Simulate the committee generator (the real one is deployed separately).
-# Sleeps 10s (~3 block times at 2.8s/block) so the re-run loop gets a fresh round
-# at least 2 ahead of the saved lastProcessedRound.
-RUN mkdir -p /opt/xgov-committees/packages/committee-generator/dist \
- && printf 'setTimeout(() => process.exit(0), 10_000);\n' \
-    > /opt/xgov-committees/packages/committee-generator/dist/index.js
+RUN mkdir -p /opt/xgov-committees/packages/committee-generator/dist
+COPY packages/runner/test/fixtures/generator-default.js \
+     /opt/xgov-committees/packages/committee-generator/dist/index.js
+COPY packages/runner/test/fixtures/generator-graceful-exit.mjs \
+     /opt/xgov-committees/packages/committee-generator/dist/generator-graceful-exit.mjs
 
 RUN chown -R root:xgov-committees-runner /opt/xgov-committees \
  && chmod -R u=rwX,g=rX,o= /opt/xgov-committees
@@ -53,8 +53,7 @@ RUN mkdir -p /var/lib/xgov-committees-runner \
     '/var/lib/xgov-committees-runner/wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_-3147789458.json'
 
 RUN cp systemd/runner.service /etc/systemd/system/ \
- && cp systemd/runner.timer /etc/systemd/system/ \
- && systemctl enable runner.timer
+ && cp systemd/runner.timer /etc/systemd/system/
 
 RUN systemctl mask \
     getty@tty1.service \
