@@ -34,11 +34,9 @@ RUN apt-get update \
 RUN npm run build
 
 # Simulate the committee generator (the real one is deployed separately).
-# Sleeps 10s (~3 block times at 2.8s/block) so the re-run loop gets a fresh round
-# at least 2 ahead of the saved lastProcessedRound.
-RUN mkdir -p /opt/xgov-committees/packages/committee-generator/dist \
- && printf 'setTimeout(() => process.exit(0), 10_000);\n' \
-    > /opt/xgov-committees/packages/committee-generator/dist/index.js
+RUN mkdir -p /opt/xgov-committees/packages/committee-generator/dist
+COPY packages/runner/test/fixtures/generator-default.js \
+     /opt/xgov-committees/packages/committee-generator/dist/index.js
 
 RUN chown -R root:xgov-committees-runner /opt/xgov-committees \
  && chmod -R u=rwX,g=rX,o= /opt/xgov-committees

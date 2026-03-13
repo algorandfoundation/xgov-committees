@@ -8,7 +8,7 @@ import { saveState } from "../../src/state.ts";
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const REGISTRY_APP_ID = 3147789458;
 const FIRST_SYNC_ROUND = 50_000_000;
-const FIXTURES = join(import.meta.dirname, "fixtures");
+const FIXTURES = join(import.meta.dirname, "../fixtures");
 const RUNNER_ROOT = join(import.meta.dirname, "../..");
 
 describe("runner", () => {
