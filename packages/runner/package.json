@@ -12,11 +12,11 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run test:unit && npm run test:smoke && npm run test:integration",
+    "test": "npm run test:unit && npm run test:integration",
     "test:coverage": "vitest run --coverage",
     "test:unit": "bash test/unit/run-unit.sh",
     "test:integration": "vitest run test/integration",
-    "test:smoke": "vitest run test/smoke"
+    "test:systemd": "bash test/systemd/run-test-container.sh boot && bash test/systemd/run-test-container.sh stop"
   },
   "dependencies": {
     "@algorandfoundation/algokit-utils": "^9.2.0",
