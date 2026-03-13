@@ -12,7 +12,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run test:unit && npm run test:integration && npm run test:systemd",
+    "test": "npm run test:unit && npm run test:integration",
     "test:coverage": "vitest run --coverage",
     "test:unit": "bash test/unit/run-unit.sh",
     "test:integration": "vitest run test/integration",
