@@ -22,7 +22,7 @@ const mockFromConfig = vi.mocked(AlgorandClient.fromConfig);
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const ROUND_BUFFER = 21;
-const REGISTRY_CREATION_ROUND = 52307574;
+const FIRST_SYNC_ROUND = 50_000_000;
 
 function makeChildProcess(exitCode: number | null = 0, signal: string | null = null) {
   const emitter = new EventEmitter() as ChildProcess;
@@ -462,7 +462,7 @@ describe("run", () => {
     await expect(run(makeConfig())).rejects.toThrow("generator reached chain tip even after retrying");
   });
 
-  it("bootstraps from REGISTRY_CREATION_ROUND when no state file exists", async () => {
+  it("bootstraps from FIRST_SYNC_ROUND when no state file exists", async () => {
     const { algorand } = makeRunAlgorand(58_000_042n);
     mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
     mockLoadState.mockReturnValueOnce(null).mockReturnValueOnce({ lastProcessedRound: 58_000_042, updatedAt: "" });
@@ -483,7 +483,7 @@ describe("run", () => {
         "--mode",
         "write-cache",
         "--from-block",
-        String(REGISTRY_CREATION_ROUND),
+        String(FIRST_SYNC_ROUND),
         "--to-block",
         "58000042",
       ],
@@ -496,7 +496,7 @@ describe("run", () => {
       999,
       expect.objectContaining({ lastProcessedRound: 58_000_042 }),
     );
-    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining(String(REGISTRY_CREATION_ROUND)));
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining(String(FIRST_SYNC_ROUND)));
   });
 
   it("throws on first iteration when algod round is not ahead of the next round to process", async () => {

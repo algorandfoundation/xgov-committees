@@ -6,9 +6,7 @@ import { loadState, saveState } from "./state.ts";
 import { crossed100KBoundary, closeTo1MBoundary, next1MBoundary } from "./utils.ts";
 
 const ROUND_BUFFER = 21; // ~1m at 2.8s per block
-// Creation round of the first mainnet registry app (id 3147789458, tx F6YHCQJJDNXY3ABSTOITQAY3KDVFMAOFIPMHM2HRCOTW72TLUX3Q).
-// Even if a new registry version is deployed in the future, this service calculates committees from the very first governance period in xGov.
-const REGISTRY_CREATION_ROUND = 52307574;
+const FIRST_SYNC_ROUND = 50_000_000;
 
 // Mirrors committee-generator's ExitCode
 const GENERATOR_EXIT_CODE = {
@@ -120,10 +118,10 @@ export async function run(config: Config): Promise<void> {
     const state = loadState(config.stateDir, genesisHash, config.registryAppId);
     if (state === null) {
       console.log(
-        `No state file found — bootstrapping from round ${REGISTRY_CREATION_ROUND} (\`write-cache\` mode is idempotent)`,
+        `No state file found — bootstrapping from round ${FIRST_SYNC_ROUND} (\`write-cache\` mode is idempotent)`,
       );
     }
-    const nextRoundToProcess = (state?.lastProcessedRound ?? REGISTRY_CREATION_ROUND - 1) + 1;
+    const nextRoundToProcess = (state?.lastProcessedRound ?? FIRST_SYNC_ROUND - 1) + 1;
 
     if (runCounter === 1) console.log(`genesis: ${genesisHash}, registry: ${config.registryAppId}`);
     console.log(`[#${runCounter}] round ${currentRound}, next to process: ${nextRoundToProcess}`);
