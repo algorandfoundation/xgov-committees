@@ -44,7 +44,19 @@ ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
 Absolute paths for both the Node binary and compiled entry point (no dependency on PATH). The TypeScript source MUST be compiled to JavaScript during the build step in CI/CD before deployment.
 
 ```ini
-User=xgov-committee-runner
+RuntimeMaxSec=3h
+```
+
+Hard ceiling on total service runtime. If the process has not exited within this time window, systemd sends `SIGTERM`.
+
+```ini
+TimeoutStopSec=90
+```
+
+Systemd default, set explicitly for clarity. After `RuntimeMaxSec` (or any other stop) sends `SIGTERM`, systemd waits this long before sending `SIGKILL`. Must be greater than `GENERATOR_SIGTERM_GRACE_MS` (`src/index.ts`), the time the Node process waits for its child to exit after receiving `SIGTERM`.
+
+```ini
+User=xgov-committees-runner
 ```
 
 Runs as a dedicated unprivileged user, restricting access if the process is compromised.
@@ -61,7 +73,7 @@ Empty section, omitted. The service is triggered exclusively by the timer. `[Ins
 OnUnitInactiveSec=50min
 ```
 
-Re-triggers the service 50 minutes after its completion. Combined with an expected ~10 minute run time, this produces a ~60 minute cycle. TODO: decide whether to use `OnUnitInactiveSec` or `OnUnitActiveSec`.
+Re-triggers the service 50 minutes after its last completion. By using `OnUnitInactiveSec`, the timer only begins once the service exits (becomes inactive). This ensures a 50-minute gap between runs and eliminates overlap risk regardless of execution time (subject to the `RuntimeMaxSec` cap).
 
 ```ini
 OnBootSec=0

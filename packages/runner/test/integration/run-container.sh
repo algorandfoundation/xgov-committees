@@ -8,6 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNNER_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WORKSPACE_ROOT="$(cd "$RUNNER_DIR/../.." && pwd)"
 IMAGE="xgov-runner-integration"
 CONTAINER="xgov-runner-integration-$$"
 
@@ -28,7 +29,7 @@ trap cleanup EXIT
 
 docker build --target integration -t "$IMAGE" \
   -f "$SCRIPT_DIR/../Dockerfile" \
-  "$RUNNER_DIR" 2>&1
+  "$WORKSPACE_ROOT" 2>&1
 
 docker run -d \
   --name "$CONTAINER" \

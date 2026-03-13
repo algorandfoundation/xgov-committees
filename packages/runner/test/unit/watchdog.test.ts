@@ -1,11 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WATCHDOG_INTERVAL_MS } from "../../watchdog.ts";
+import { WATCHDOG_INTERVAL_MS } from "../../src/watchdog.ts";
 
 // vi.mock is hoisted before imports, so watchdog.ts gets the mocked spawnSync.
 vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
 
-import { notifySystemd, startWatchdog } from "../../watchdog.ts";
+import { notifySystemd, startWatchdog } from "../../src/watchdog.ts";
 
 describe("watchdog", () => {
   const mockSpawnSync = vi.mocked(spawnSync);
@@ -42,12 +42,46 @@ describe("watchdog", () => {
   describe("startWatchdog", () => {
     it("sends WATCHDOG=1 at the configured interval", () => {
       vi.useFakeTimers();
-      const handle = startWatchdog();
+      const handle = startWatchdog(() => {});
       vi.advanceTimersByTime(WATCHDOG_INTERVAL_MS + 1);
       clearInterval(handle);
       expect(mockSpawnSync).toHaveBeenCalledWith("systemd-notify", ["WATCHDOG=1"], {
         stdio: "ignore",
       });
+    });
+
+    it("calls onFailure with the error when notifySystemd throws", () => {
+      vi.useFakeTimers();
+      const error = new Error("systemd-notify failed: exit 1");
+      mockSpawnSync.mockReturnValue({ error: null, status: 1 } as unknown as ReturnType<typeof spawnSync>);
+      const onFailure = vi.fn();
+      const handle = startWatchdog(onFailure);
+      vi.advanceTimersByTime(WATCHDOG_INTERVAL_MS + 1);
+      clearInterval(handle);
+      expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ message: error.message }));
+    });
+
+    it("wraps a non-Error thrown value in a new Error before calling onFailure", () => {
+      vi.useFakeTimers();
+      // spawnSync throwing a string propagates out of notifySystemd as a non-Error
+      mockSpawnSync.mockImplementation(() => {
+        throw "spawnSync exploded";
+      });
+      const onFailure = vi.fn();
+      const handle = startWatchdog(onFailure);
+      vi.advanceTimersByTime(WATCHDOG_INTERVAL_MS + 1);
+      clearInterval(handle);
+      expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ message: "spawnSync exploded" }));
+    });
+
+    it("calls onFailure exactly once even if the interval fires multiple times after failure", () => {
+      vi.useFakeTimers();
+      mockSpawnSync.mockReturnValue({ error: null, status: 1 } as unknown as ReturnType<typeof spawnSync>);
+      const onFailure = vi.fn();
+      const handle = startWatchdog(onFailure);
+      vi.advanceTimersByTime(WATCHDOG_INTERVAL_MS * 3 + 1);
+      clearInterval(handle);
+      expect(onFailure).toHaveBeenCalledTimes(1);
     });
   });
 });
