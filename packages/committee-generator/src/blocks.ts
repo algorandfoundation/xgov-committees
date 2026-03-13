@@ -5,16 +5,32 @@ import { subtractCached, getCache, setCache } from './cache';
 import { chunk, clearLine, formatDuration, sleep } from './utils';
 import { BlockHeader } from 'algosdk';
 import { BlockResponse } from 'algosdk/dist/types/client/v2/algod/models/types';
-import { guardWhileNotShuttingDown } from './shutdown';
+import { guardWhileNotShuttingDown, fatalError } from './shutdown';
 
 /**
  * Error thrown when attempting to fetch a block beyond the blockchain tip.
  */
 export class TipReachedError extends Error {
-  constructor(public readonly blockNumber: number) {
+  constructor(public readonly blockNumber: bigint) {
     super(`Block ${blockNumber} not available. The tip of the blockchain has been reached.`);
     this.name = 'TipReachedError';
   }
+}
+
+const DELTA_TOLERANCE = 5n;
+
+/**
+ * Determines whether a TipReachedError is a genuine tip condition or an unexpected failure.
+ * A genuine tip condition is when the requested block is within delta tolerance of lastRound.
+ * @returns true if within tolerance (expected), false if outside tolerance (unexpected error)
+ */
+export function isGenuineTipReached(
+  blockNumber: bigint,
+  lastRound: bigint,
+  deltaTolerance: bigint = DELTA_TOLERANCE,
+): boolean {
+  const delta = lastRound - blockNumber;
+  return delta <= deltaTolerance;
 }
 
 const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
@@ -114,7 +130,15 @@ const _getBlock = async (rnd: number, skipCache: boolean = false): Promise<Block
     const errorMessage = e instanceof Error ? e.message : String(e);
     // Check if block is not available (404 error from ledger)
     if (errorMessage.includes('failed to retrieve information from the ledger')) {
-      throw new TipReachedError(rnd);
+      const { lastRound } = await algod.status().do();
+      if (!isGenuineTipReached(BigInt(rnd), lastRound)) {
+        await fatalError(
+          new Error(
+            `Block ${rnd} request failed unexpectedly (lastRound: ${lastRound}, delta exceeds tolerance: ${DELTA_TOLERANCE})`,
+          ),
+        );
+      }
+      throw new TipReachedError(BigInt(rnd));
     }
 
     // rethrow other errors

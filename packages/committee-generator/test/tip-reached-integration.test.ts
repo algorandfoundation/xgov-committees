@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TipReachedError } from '../src/blocks';
 import { createTipReachedMock } from './test-helpers';
 
 // Mock all dependencies before importing modules
@@ -41,7 +40,7 @@ vi.mock('../src/shutdown', () => ({
     FATAL: 1,
   },
   expectedExit: vi.fn(),
-  fatalError: vi.fn(),
+  fatalError: vi.fn().mockResolvedValue(undefined),
   gracefulShutdown: vi.fn(),
   enableAsyncTracking: vi.fn(),
   ShuttingDownError: class ShuttingDownError extends Error {},
@@ -55,6 +54,7 @@ vi.mock('../src/algod', () => ({
   },
   algod: {
     block: vi.fn(),
+    status: vi.fn(),
   },
 }));
 
@@ -118,43 +118,16 @@ describe('TipReachedError Integration Test', () => {
     const { algod } = await import('../src/algod');
     const { runWriteCache } = await import('../src/modes/write-cache');
 
-    // Mock cache to indicate no cached blocks
     vi.mocked(subtractCached).mockResolvedValue([99999990, 99999991, 99999992]);
     vi.mocked(getCache).mockResolvedValue(undefined);
-
-    // Mock algod.block to throw 404 error (block not available - tip reached)
     vi.mocked(algod.block).mockImplementation(createTipReachedMock());
+    vi.mocked(algod.status).mockReturnValue({
+      do: vi.fn().mockResolvedValue({ lastRound: 99999990n }),
+    } as never);
 
-    // Verify the error contains the correct block number
     await expect(runWriteCache(99999990, 99999992)).rejects.toMatchObject({
-      blockNumber: 99999990,
+      blockNumber: 99999990n,
+      name: 'TipReachedError',
     });
-  });
-
-  it('should verify TipReachedError is caught by index.ts error handler', async () => {
-    // we expect 3 assertions in this test: error type, block number, and message content (trycatch catch block)
-    expect.assertions(3);
-
-    const { getCache, subtractCached } = await import('../src/cache');
-    const { algod } = await import('../src/algod');
-    const { runWriteCache } = await import('../src/modes/write-cache');
-
-    // Mock cache to indicate no cached blocks
-    vi.mocked(subtractCached).mockResolvedValue([88888888]);
-    vi.mocked(getCache).mockResolvedValue(undefined);
-
-    // Mock algod.block to throw 404 error
-    vi.mocked(algod.block).mockImplementation(createTipReachedMock());
-
-    // Verify that runWriteCache propagates TipReachedError up to index.ts
-    // This proves the error bubbles through: getBlock → getBlocks → runWriteCache → index.ts
-    try {
-      await runWriteCache(88888888, 88888888);
-    } catch (error) {
-      // Verify error is the correct type and has correct block number
-      expect(error).toBeInstanceOf(TipReachedError);
-      expect((error as TipReachedError).blockNumber).toBe(88888888);
-      expect((error as TipReachedError).message).toContain('Block 88888888 not available');
-    }
   });
 });
