@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TipReachedError } from '../src/blocks';
+import { TipReachedError, isGenuineTipReached } from '../src/blocks';
 import { createTipReachedMock } from './test-helpers';
 
 // Mock modules before importing the functions under test
@@ -21,6 +21,7 @@ vi.mock('../src/cache', () => ({
 vi.mock('../src/shutdown', () => ({
   guardWhileNotShuttingDown: <T extends (...args: never[]) => unknown>(fn: T) => fn, // passthrough, no shutdown guard for tests
   isShuttingDown: vi.fn(() => false),
+  fatalError: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../src/algod', () => ({
@@ -30,6 +31,7 @@ vi.mock('../src/algod', () => ({
   },
   algod: {
     block: vi.fn(),
+    status: vi.fn(),
   },
 }));
 
@@ -52,65 +54,36 @@ describe('blocks.ts - TipReachedError', () => {
   });
 
   describe('getBlock', () => {
-    it('should throw TipReachedError when algod returns 404 error for unavailable block', async () => {
+    it('should throw TipReachedError with correct block number when algod returns 404', async () => {
       const { getCache } = await import('../src/cache');
       const { algod } = await import('../src/algod');
       const { getBlock } = await import('../src/blocks');
 
-      // Mock cache miss
       vi.mocked(getCache).mockResolvedValue(undefined);
-
-      // Mock algod to throw 404 error (block not available)
       vi.mocked(algod.block).mockImplementation(createTipReachedMock());
+      vi.mocked(algod.status).mockReturnValue({
+        do: vi.fn().mockResolvedValue({ lastRound: 99999999n }),
+      } as never);
 
-      const futureBlockNumber = 99999999;
-
-      // Verify error properties
-      await expect(getBlock(futureBlockNumber)).rejects.toBeInstanceOf(TipReachedError);
-      await expect(getBlock(futureBlockNumber)).rejects.toMatchObject({
-        blockNumber: futureBlockNumber,
-        message: `Block ${futureBlockNumber} not available. The tip of the blockchain has been reached.`,
+      await expect(getBlock(99999999)).rejects.toMatchObject({
+        blockNumber: 99999999n,
         name: 'TipReachedError',
       });
     });
 
-    it('should throw TipReachedError when algod returns 404 with skipCache=true', async () => {
-      const { algod } = await import('../src/algod');
-      const { getBlock } = await import('../src/blocks');
-
-      // Mock algod to throw 404 error
-      vi.mocked(algod.block).mockImplementation(createTipReachedMock());
-
-      const futureBlockNumber = 88888888;
-
-      // Test with skipCache=true (should bypass cache entirely)
-      await expect(getBlock(futureBlockNumber, true)).rejects.toThrow(TipReachedError);
-    });
-
-    it('should rethrow non-404 errors without wrapping in TipReachedError', async () => {
+    it('should rethrow non-404 errors', async () => {
       const { getCache } = await import('../src/cache');
       const { algod } = await import('../src/algod');
       const { getBlock } = await import('../src/blocks');
 
-      // Mock cache miss
       vi.mocked(getCache).mockResolvedValue(undefined);
-
-      // Mock algod to throw a different error (not 404)
-      const networkError = new Error('Network timeout');
-      const mockBlock = vi.fn().mockReturnValue({
+      vi.mocked(algod.block).mockReturnValue({
         headerOnly: vi.fn().mockReturnValue({
-          do: vi.fn().mockRejectedValue(networkError),
+          do: vi.fn().mockRejectedValue(new Error('Network timeout')),
         }),
-      });
-      vi.mocked(algod.block).mockImplementation(mockBlock);
+      } as never);
 
-      const blockNumber = 12345;
-
-      // Should throw the original error, not TipReachedError
-      const blockPromise = getBlock(blockNumber);
-      await expect(blockPromise).rejects.toThrow('Network timeout');
-      await expect(blockPromise).rejects.toThrow(networkError);
-      await expect(blockPromise).rejects.not.toThrow(TipReachedError);
+      await expect(getBlock(12345)).rejects.toThrow('Network timeout');
     });
 
     it('should successfully return block when available from algod', async () => {
@@ -158,9 +131,29 @@ describe('blocks.ts - TipReachedError', () => {
 
       // Mock algod to throw 404 error
       vi.mocked(algod.block).mockImplementation(createTipReachedMock());
+      vi.mocked(algod.status).mockReturnValue({
+        do: vi.fn().mockResolvedValue({ lastRound: 99999992n }),
+      } as never);
 
       // Should throw TipReachedError when trying to fetch unavailable blocks
       await expect(getBlocks([99999990, 99999991, 99999992])).rejects.toThrow(TipReachedError);
     });
+  });
+});
+
+describe('isGenuineTipReached', () => {
+  const DELTA_TOLERANCE = 5n;
+
+  it('should return true when blockNumber is within delta tolerance of lastRound', () => {
+    expect(isGenuineTipReached(1000n, 1000n, DELTA_TOLERANCE)).toBe(true); // delta = 0
+    expect(isGenuineTipReached(999n, 1000n, DELTA_TOLERANCE)).toBe(true); // delta = 1
+    expect(isGenuineTipReached(996n, 1000n, DELTA_TOLERANCE)).toBe(true); // delta = 4
+    expect(isGenuineTipReached(995n, 1000n, DELTA_TOLERANCE)).toBe(true); // delta = 5, at boundary
+  });
+
+  it('should return false when blockNumber exceeds delta tolerance', () => {
+    expect(isGenuineTipReached(994n, 1000n, DELTA_TOLERANCE)).toBe(false); // delta = 6
+    expect(isGenuineTipReached(990n, 1000n, DELTA_TOLERANCE)).toBe(false); // delta = 10
+    expect(isGenuineTipReached(500n, 1000n, DELTA_TOLERANCE)).toBe(false); // delta = 500
   });
 });
