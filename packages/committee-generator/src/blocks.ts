@@ -29,7 +29,7 @@ export function isGenuineTipReached(
   lastRound: bigint,
   deltaTolerance: bigint = DELTA_TOLERANCE,
 ): boolean {
-  const delta = lastRound - blockNumber;
+  const delta = lastRound >= blockNumber ? lastRound - blockNumber : blockNumber - lastRound;
   return delta <= deltaTolerance;
 }
 
