@@ -6,6 +6,7 @@ import { loadState, saveState } from "./state.ts";
 import { crossed100KBoundary, closeTo1MBoundary, next1MBoundary } from "./utils.ts";
 
 const ROUND_BUFFER = 21; // ~1m at 2.8s per block
+const FIRST_SYNC_ROUND = 50_000_000;
 
 // Mirrors committee-generator's ExitCode
 const GENERATOR_EXIT_CODE = {
@@ -116,10 +117,11 @@ export async function run(config: Config): Promise<void> {
 
     const state = loadState(config.stateDir, genesisHash, config.registryAppId);
     if (state === null) {
-      // TODO: handle warm up
-      throw new Error("No existing state file found - This case needs implementation");
+      console.log(
+        `No state file found — bootstrapping from round ${FIRST_SYNC_ROUND} (\`write-cache\` mode is idempotent)`,
+      );
     }
-    const nextRoundToProcess = state.lastProcessedRound + 1;
+    const nextRoundToProcess = (state?.lastProcessedRound ?? FIRST_SYNC_ROUND - 1) + 1;
 
     if (runCounter === 1) console.log(`genesis: ${genesisHash}, registry: ${config.registryAppId}`);
     console.log(`[#${runCounter}] round ${currentRound}, next to process: ${nextRoundToProcess}`);

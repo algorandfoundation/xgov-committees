@@ -7,7 +7,7 @@ console.log(`  algod:      ${config.algodServer}:${config.algodPort}`);
 console.log(`  registry:   ${config.registryAppId}`);
 console.log("Runner started successfully.");
 
-const GENERATOR_SIGTERM_GRACE_MS = 10_000;
+const GENERATOR_SIGTERM_GRACE_MS = 40_000;
 
 let shuttingDown = false;
 

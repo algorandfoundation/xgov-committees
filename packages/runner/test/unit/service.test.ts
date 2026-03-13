@@ -22,6 +22,7 @@ const mockFromConfig = vi.mocked(AlgorandClient.fromConfig);
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const ROUND_BUFFER = 21;
+const FIRST_SYNC_ROUND = 50_000_000;
 
 function makeChildProcess(exitCode: number | null = 0, signal: string | null = null) {
   const emitter = new EventEmitter() as ChildProcess;
@@ -433,12 +434,41 @@ describe("run", () => {
     await expect(run(makeConfig())).rejects.toThrow("generator reached chain tip even after retrying");
   });
 
-  it("throws when no state file exists", async () => {
+  it("bootstraps from FIRST_SYNC_ROUND when no state file exists", async () => {
     const { algorand } = makeRunAlgorand(58_000_042n);
     mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
-    mockLoadState.mockReturnValue(null);
+    mockLoadState.mockReturnValueOnce(null).mockReturnValueOnce({ lastProcessedRound: 58_000_042, updatedAt: "" });
 
-    await expect(run(makeConfig())).rejects.toThrow("No existing state file found");
+    const { child, emitClose } = makeChildProcess(0);
+    mockSpawn.mockImplementation(() => {
+      process.nextTick(emitClose);
+      return child;
+    });
+
+    await run(makeConfig());
+
+    expect(mockSpawn).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "node",
+      [
+        "/fake/generator.js",
+        "--mode",
+        "write-cache",
+        "--from-block",
+        String(FIRST_SYNC_ROUND),
+        "--to-block",
+        "58000042",
+      ],
+      expect.anything(),
+    );
+    expect(mockSaveState).toHaveBeenCalledOnce();
+    expect(mockSaveState).toHaveBeenCalledWith(
+      stateDir,
+      MAINNET_GENESIS_HASH,
+      999,
+      expect.objectContaining({ lastProcessedRound: 58_000_042 }),
+    );
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining(String(FIRST_SYNC_ROUND)));
   });
 
   it("throws on first iteration when algod round is not ahead of the next round to process", async () => {

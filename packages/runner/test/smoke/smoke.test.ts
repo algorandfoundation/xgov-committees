@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -7,6 +7,7 @@ import { saveState } from "../../src/state.ts";
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const REGISTRY_APP_ID = 3147789458;
+const FIRST_SYNC_ROUND = 50_000_000;
 const FIXTURES = join(import.meta.dirname, "fixtures");
 const RUNNER_ROOT = join(import.meta.dirname, "../..");
 
@@ -67,6 +68,25 @@ describe("runner smoke test", () => {
       updatedAt: new Date().toISOString(),
     });
   }
+
+  it("bootstraps from round FIRST_SYNC_ROUND when no state file exists", () => {
+    const freshDir = mkdtempSync(join(tmpdir(), "runner-bootstrap-"));
+    try {
+      const result = runRunner({
+        ...baseEnv(),
+        STATE_DIR: freshDir,
+        COMMITTEE_GENERATOR_PATH: join(FIXTURES, "instant-generator.js"),
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(`bootstrapping from round ${FIRST_SYNC_ROUND}`);
+      const stateFiles = readdirSync(freshDir).filter((f) => f.endsWith(".json"));
+      expect(stateFiles).toHaveLength(1);
+      const state = JSON.parse(readFileSync(join(freshDir, stateFiles[0]), "utf8"));
+      expect(state.lastProcessedRound).toBeGreaterThan(0);
+    } finally {
+      rmSync(freshDir, { recursive: true, force: true });
+    }
+  });
 
   it("starts and exits 0 with expected output", () => {
     const result = runRunner(baseEnv());
