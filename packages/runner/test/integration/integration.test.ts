@@ -22,11 +22,13 @@ describe("runner", () => {
     chmodSync(fakeNotify, 0o755);
 
     stateDir = mkdtempSync(join(tmpdir(), "runner-state-"));
+    const algodServer = process.env.ALGOD_SERVER ?? "https://mainnet-api.4160.nodely.dev";
+    const algodPort = process.env.ALGOD_PORT ?? "443";
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), 10_000);
     let resp: Response;
     try {
-      resp = await fetch("https://mainnet-api.4160.nodely.dev/v2/transactions/params", {
+      resp = await fetch(`${algodServer}:${algodPort}/v2/transactions/params`, {
         signal: abort.signal,
       });
     } finally {
