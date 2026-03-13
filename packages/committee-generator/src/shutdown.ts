@@ -23,37 +23,6 @@ export class ShuttingDownError extends Error {
 }
 
 /**
- * TypeScript method decorator that prevents method execution during shutdown.
- * Throws ShuttingDownError if the app is shutting down.
- *
- * @example
- * class MyService {
- *   @whileNotShuttingDown
- *   async processData(data: string) {
- *     // ... method logic
- *   }
- * }
- *
- * @throws {ShuttingDownError} If the application is shutting down
- */
-export function whileNotShuttingDown(
-  target: unknown,
-  propertyKey: string | symbol,
-  descriptor: PropertyDescriptor,
-): PropertyDescriptor {
-  const originalMethod = descriptor.value;
-
-  descriptor.value = function (...args: Array<unknown>) {
-    if (shuttingDown) {
-      throw new ShuttingDownError();
-    }
-    return originalMethod.apply(this, args);
-  };
-
-  return descriptor;
-}
-
-/**
  * Function wrapper version that guards any function against shutdown.
  * Use this for standalone functions that aren't class methods.
  *
