@@ -3,7 +3,7 @@
 # Builds a privileged systemd+Node.js container, starts it with systemd as PID 1,
 # and runs the requested test scenario.
 #
-# Usage: run-test-container.sh [boot|stop]
+# Usage: run-test-container.sh [boot|stop|failure]
 
 set -euo pipefail
 
@@ -36,6 +36,15 @@ assert_result() {
   result=$(exec_container systemctl show -p Result runner.service | cut -d= -f2)
   if [ "$result" != "success" ]; then
     echo "FAIL: service Result='$result' (expected 'success')"
+    exit 1
+  fi
+}
+
+assert_failed() {
+  local result
+  result=$(exec_container systemctl show -p Result runner.service | cut -d= -f2)
+  if [ "$result" = "success" ]; then
+    echo "FAIL: service Result='$result' (expected a failure result)"
     exit 1
   fi
 }
@@ -113,8 +122,42 @@ case "$TEST_SCENARIO" in
     echo "Stop test passed."
     ;;
 
+  failure)
+    # Override generator with the fatal fixture to force the service to fail.
+    exec_container mkdir -p /etc/systemd/system/runner.service.d
+    exec_container sh -c \
+      'printf "[Service]\nEnvironment=COMMITTEE_GENERATOR_PATH=/opt/xgov-committees/packages/committee-generator/dist/generator-fatal.js\nEnvironmentFile=-/etc/xgov-committees-runner.env\n" \
+      > /etc/systemd/system/runner.service.d/override.conf'
+
+    # Write Slack credentials into the container's env file if provided by the caller.
+    # exec_container doesn't support -e; using docker exec directly to avoid shell-escaping the secrets.
+    if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_CHANNEL_ID:-}" ]; then
+      docker exec \
+        -e SLACK_BOT_TOKEN="$SLACK_BOT_TOKEN" \
+        -e SLACK_CHANNEL_ID="$SLACK_CHANNEL_ID" \
+        "$CONTAINER" sh -c \
+        'printf "SLACK_BOT_TOKEN=%s\nSLACK_CHANNEL_ID=%s\n" "$SLACK_BOT_TOKEN" "$SLACK_CHANNEL_ID" \
+        > /etc/xgov-committees-runner.env'
+    fi
+
+    exec_container systemctl daemon-reload
+
+    exec_container systemctl start runner.service || true  # expected to fail; || true prevents set -e from exiting if start itself returns non-zero
+    wait_for ActiveState "inactive|failed" 30
+    assert_failed
+
+    # ExecStopPost ran notify-slack; assert behaviour based on whether creds were provided.
+    if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_CHANNEL_ID:-}" ]; then
+      assert_log "notify-slack: notification posted"
+    else
+      assert_log "skipping notification"
+    fi
+
+    echo "Failure test passed."
+    ;;
+
   *)
-    echo "Usage: $0 [boot|stop]"
+    echo "Usage: $0 [boot|stop|failure]"
     exit 1
     ;;
 esac

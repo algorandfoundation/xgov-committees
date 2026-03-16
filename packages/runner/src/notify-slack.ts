@@ -29,6 +29,7 @@ try {
     slackBotToken,
     slackChannelId,
   });
+  console.log("notify-slack: notification posted");
 } catch (error) {
   console.error("notify-slack failed:", error);
   process.exit(1);

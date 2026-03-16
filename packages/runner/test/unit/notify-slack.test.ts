@@ -157,15 +157,13 @@ describe("postFailureNotification", () => {
     );
   });
 
-  it("catches and logs to stderr if chat.postMessage throws", async () => {
+  it("throws if chat.postMessage rejects", async () => {
     const mockPostMsg = vi.fn().mockRejectedValue(new Error("slack down"));
     MockWebClient.mockImplementationOnce(function () {
       return { chat: { postMessage: mockPostMsg } };
     });
 
-    await postFailureNotification(baseArgs);
-
-    expect(vi.mocked(console.error)).toHaveBeenCalledWith("Failed to post Slack notification:", expect.any(Error));
+    await expect(postFailureNotification(baseArgs)).rejects.toThrow("slack down");
   });
 
   it("posts with journal unavailable message when spawnSync fails", async () => {

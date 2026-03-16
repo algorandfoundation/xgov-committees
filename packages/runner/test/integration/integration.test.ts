@@ -238,6 +238,7 @@ describe("notify-slack", () => {
       },
     );
     expect(result.status).toBe(0);
-    expect(result.stderr).toBe(""); // non-empty stderr means Slack API failed silently
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("notify-slack: notification posted");
   });
 });

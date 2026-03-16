@@ -77,6 +77,11 @@ export function buildMessage(args: BuildMessageArgs): { text: string; blocks: ob
   return { text, blocks };
 }
 
+/**
+ * Posts a failure notification to Slack. Throws on Slack API error, callers (notify-slack) must handle it.
+ * Does not perform any check on args.serviceResult; as it name implies, the function assumes already a "failure"
+ * scenario (handled by isFailure).
+ */
 export async function postFailureNotification(args: PostFailureNotificationArgs): Promise<void> {
   const { unitName, slackBotToken, slackChannelId } = args;
 
@@ -84,12 +89,6 @@ export async function postFailureNotification(args: PostFailureNotificationArgs)
   const { text, blocks } = buildMessage({ ...args, journalTail });
 
   const client = new WebClient(slackBotToken);
-
-  // Intentionally catch and log: ExecStopPost failure shouldn't affect the service's reported status.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await client.chat.postMessage({ channel: slackChannelId, text, blocks: blocks as any[] });
-  } catch (error) {
-    console.error("Failed to post Slack notification:", error);
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await client.chat.postMessage({ channel: slackChannelId, text, blocks: blocks as any[] });
 }

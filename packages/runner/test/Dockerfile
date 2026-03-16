@@ -39,6 +39,8 @@ COPY packages/runner/test/fixtures/generator-default.js \
      /opt/xgov-committees/packages/committee-generator/dist/index.js
 COPY packages/runner/test/fixtures/generator-graceful-exit.mjs \
      /opt/xgov-committees/packages/committee-generator/dist/generator-graceful-exit.mjs
+COPY packages/runner/test/fixtures/generator-fatal.js \
+     /opt/xgov-committees/packages/committee-generator/dist/generator-fatal.js
 
 RUN chown -R root:xgov-committees-runner /opt/xgov-committees \
  && chmod -R u=rwX,g=rX,o= /opt/xgov-committees
