@@ -36,6 +36,13 @@ function makeAlgorandClient(statusAfterBlock: Mock): AlgorandClient {
 }
 
 describe("waitForBlock", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("resolves in one call when the chain is already at the target round", async () => {
     const statusAfterBlock = vi.fn().mockReturnValue({
       do: async () => ({ lastRound: BigInt(1000) }),
@@ -60,6 +67,27 @@ describe("waitForBlock", () => {
       .mockReturnValueOnce({ do: async () => ({ lastRound: BigInt(1000) }) });
     await waitForBlock(makeAlgorandClient(statusAfterBlock), 1000);
     expect(statusAfterBlock).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries and warns when algod throws, covering both Error and non-Error thrown values", async () => {
+    const statusAfterBlock = vi
+      .fn()
+      .mockImplementationOnce(() => ({
+        do: async () => {
+          throw "string error";
+        },
+      }))
+      .mockImplementationOnce(() => ({
+        do: async () => {
+          throw new Error("connection reset");
+        },
+      }))
+      .mockReturnValueOnce({ do: async () => ({ lastRound: BigInt(1000) }) });
+    await waitForBlock(makeAlgorandClient(statusAfterBlock), 1000);
+    expect(statusAfterBlock).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(console.warn)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(console.warn)).toHaveBeenCalledWith(expect.stringContaining("string error"));
+    expect(vi.mocked(console.warn)).toHaveBeenCalledWith(expect.stringContaining("connection reset"));
   });
 });
 
