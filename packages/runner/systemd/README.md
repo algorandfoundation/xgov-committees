@@ -44,10 +44,12 @@ ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
 Absolute paths for both the Node binary and compiled entry point (no dependency on PATH). The TypeScript source MUST be compiled to JavaScript during the build step in CI/CD before deployment.
 
 ```ini
-ExecStopPost=/usr/bin/node /opt/xgov-committees/packages/runner/dist/notify-slack.js --exit-status=${EXIT_STATUS} --service-result=${SERVICE_RESULT} --hostname=%H
+ExecStopPost=-/usr/bin/node /opt/xgov-committees/packages/runner/dist/notify-slack.js --exit-status=${EXIT_STATUS} --service-result=${SERVICE_RESULT} --hostname=%H
 ```
 
 Runs after the main process exits (regardless of success or failure) and posts a Slack notification on failure. `$EXIT_STATUS` and `$SERVICE_RESULT` are systemd environment variables available in `ExecStopPost`; `%H` is a specifier resolved to the machine hostname at unit parse time.
+
+The `-` prefix makes this directive non-fatal: if `notify-slack` fails (e.g. Slack is down, env vars not configured), systemd ignores the non-zero exit and the unit's status reflects only the main service. Slack notifications are best-effort.
 
 ```ini
 RuntimeMaxSec=3h
@@ -66,6 +68,12 @@ User=xgov-committees-runner
 ```
 
 Runs as a dedicated unprivileged user, restricting access if the process is compromised.
+
+```ini
+SupplementaryGroups=systemd-journal
+```
+
+Grants the service read access to the systemd journal. Required so that `ExecStopPost` (`notify-slack`) can call `journalctl` to collect the log tail included in failure notifications.
 
 ### Install
 
