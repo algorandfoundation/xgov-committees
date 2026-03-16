@@ -16,8 +16,8 @@ const slackBotToken = process.env.SLACK_BOT_TOKEN;
 const slackChannelId = process.env.SLACK_CHANNEL_ID;
 
 if (!slackBotToken || !slackChannelId) {
-  console.error("Missing required env vars: SLACK_BOT_TOKEN, SLACK_CHANNEL_ID");
-  process.exit(1);
+  console.error("notify-slack: SLACK_BOT_TOKEN and SLACK_CHANNEL_ID are not set — skipping notification");
+  process.exit(0);
 }
 
 try {
