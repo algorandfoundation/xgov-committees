@@ -224,7 +224,7 @@ describe("notify-slack", () => {
 
   const hasSlackCreds = !!(process.env.SLACK_BOT_TOKEN && process.env.SLACK_CHANNEL_ID);
 
-  it.skipIf(!hasSlackCreds)("exits 0 with valid Slack credentials", () => {
+  it.skipIf(!hasSlackCreds)("posts failure notification to Slack and exits 0", () => {
     const result = spawnSync(
       "node",
       [NOTIFY_SCRIPT, "--exit-status", "1", "--service-result", "exit-code", "--hostname", "integration-test"],
@@ -238,5 +238,6 @@ describe("notify-slack", () => {
       },
     );
     expect(result.status).toBe(0);
+    expect(result.stderr).toBe(""); // non-empty stderr means Slack API failed silently
   });
 });

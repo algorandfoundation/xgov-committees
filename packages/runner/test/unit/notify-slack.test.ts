@@ -118,6 +118,7 @@ describe("postFailureNotification", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     MockWebClient.mockClear();
+    mockSpawnSync.mockClear();
   });
   afterEach(() => {
     vi.restoreAllMocks();
