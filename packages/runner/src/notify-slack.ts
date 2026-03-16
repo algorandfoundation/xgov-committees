@@ -1,7 +1,7 @@
 import "dotenv/config";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import { postFailureNotification } from "./slack.ts";
+import { isFailure, postFailureNotification } from "./slack.ts";
 
 const argv = await yargs(hideBin(process.argv))
   .option("exit-status", { type: "string", demandOption: true })
@@ -9,6 +9,8 @@ const argv = await yargs(hideBin(process.argv))
   .option("hostname", { type: "string", demandOption: true })
   .strict()
   .parse();
+
+if (!isFailure(argv.serviceResult)) process.exit(0);
 
 const slackBotToken = process.env.SLACK_BOT_TOKEN;
 const slackChannelId = process.env.SLACK_CHANNEL_ID;

@@ -123,11 +123,6 @@ describe("postFailureNotification", () => {
     vi.restoreAllMocks();
   });
 
-  it("skips posting when serviceResult is 'success'", async () => {
-    await postFailureNotification({ ...baseArgs, serviceResult: "success" });
-    expect(MockWebClient).not.toHaveBeenCalled();
-  });
-
   it("posts to Slack with correct channel and message on failure", async () => {
     const mockPostMsg = vi.fn().mockResolvedValue({ ok: true });
     MockWebClient.mockImplementationOnce(function () {

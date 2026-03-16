@@ -78,9 +78,7 @@ export function buildMessage(args: BuildMessageArgs): { text: string; blocks: ob
 }
 
 export async function postFailureNotification(args: PostFailureNotificationArgs): Promise<void> {
-  const { serviceResult, unitName, slackBotToken, slackChannelId } = args;
-
-  if (!isFailure(serviceResult)) return;
+  const { unitName, slackBotToken, slackChannelId } = args;
 
   const journalTail = getJournalTail(unitName);
   const { text, blocks } = buildMessage({ ...args, journalTail });
