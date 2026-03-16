@@ -206,7 +206,7 @@ describe("notify-slack", () => {
     expect(result.stderr).toBe("");
   });
 
-  it("logs warning and exits 0 when Slack env vars are missing and service-result is not success", () => {
+  it("logs warning and exits 1 when Slack env vars are missing and service-result is not success", () => {
     const result = spawnSync(
       "node",
       [
@@ -222,7 +222,7 @@ describe("notify-slack", () => {
       ],
       { encoding: "utf8", env: { ...process.env, SLACK_BOT_TOKEN: "", SLACK_CHANNEL_ID: "" } },
     );
-    expect(result.status).toBe(0);
+    expect(result.status).toBe(1);
     expect(result.stderr).toContain("skipping notification");
   });
 
