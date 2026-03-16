@@ -79,7 +79,7 @@ export function buildMessage(args: BuildMessageArgs): { text: string; blocks: ob
 
 /**
  * Posts a failure notification to Slack. Throws on Slack API error, callers (notify-slack) must handle it.
- * Does not perform any check on args.serviceResult; as it name implies, the function assumes already a "failure"
+ * Does not perform any check on args.serviceResult; as its name implies, the function assumes already a "failure"
  * scenario (handled by isFailure).
  */
 export async function postFailureNotification(args: PostFailureNotificationArgs): Promise<void> {

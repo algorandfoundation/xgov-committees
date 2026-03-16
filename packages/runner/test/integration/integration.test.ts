@@ -193,12 +193,12 @@ describe("runner", () => {
 });
 
 describe("notify-slack", () => {
-  const NOTIFY_SCRIPT = join(RUNNER_ROOT, "dist", "notify-slack.js");
+  const NOTIFY_SCRIPT = join(RUNNER_ROOT, "src", "notify-slack.ts");
 
   it("exits 0 silently when service-result is success", () => {
     const result = spawnSync(
       "node",
-      [NOTIFY_SCRIPT, "--exit-status", "0", "--service-result", "success", "--hostname", "test"],
+      ["--import", "tsx/esm", NOTIFY_SCRIPT, "--exit-status", "0", "--service-result", "success", "--hostname", "test"],
       { encoding: "utf8" },
     );
     expect(result.status).toBe(0);
@@ -209,7 +209,17 @@ describe("notify-slack", () => {
   it("logs warning and exits 0 when Slack env vars are missing and service-result is not success", () => {
     const result = spawnSync(
       "node",
-      [NOTIFY_SCRIPT, "--exit-status", "1", "--service-result", "exit-code", "--hostname", "test"],
+      [
+        "--import",
+        "tsx/esm",
+        NOTIFY_SCRIPT,
+        "--exit-status",
+        "1",
+        "--service-result",
+        "exit-code",
+        "--hostname",
+        "test",
+      ],
       { encoding: "utf8", env: { ...process.env, SLACK_BOT_TOKEN: "", SLACK_CHANNEL_ID: "" } },
     );
     expect(result.status).toBe(0);
@@ -217,7 +227,7 @@ describe("notify-slack", () => {
   });
 
   it("exits 1 when required args are missing", () => {
-    const result = spawnSync("node", [NOTIFY_SCRIPT], { encoding: "utf8" });
+    const result = spawnSync("node", ["--import", "tsx/esm", NOTIFY_SCRIPT], { encoding: "utf8" });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Missing required argument");
   });
@@ -227,7 +237,17 @@ describe("notify-slack", () => {
   it.skipIf(!hasSlackCreds)("posts failure notification to Slack and exits 0", () => {
     const result = spawnSync(
       "node",
-      [NOTIFY_SCRIPT, "--exit-status", "1", "--service-result", "exit-code", "--hostname", "integration-test"],
+      [
+        "--import",
+        "tsx/esm",
+        NOTIFY_SCRIPT,
+        "--exit-status",
+        "1",
+        "--service-result",
+        "exit-code",
+        "--hostname",
+        "integration-test",
+      ],
       {
         encoding: "utf8",
         env: {

@@ -15,6 +15,6 @@ if [ "$(uname)" = "Linux" ]; then
   exec node_modules/.bin/vitest run test/unit
 else
   IMAGE="xgov-runner-test"
-  docker buildx build --target unit-test -t "$IMAGE" -f "$RUNNER_DIR/test/Dockerfile" "$WORKSPACE_ROOT"
+  docker build --target unit-test -t "$IMAGE" -f "$RUNNER_DIR/test/Dockerfile" "$WORKSPACE_ROOT"
   docker run --rm "$IMAGE"
 fi
