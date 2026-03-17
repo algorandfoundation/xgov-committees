@@ -1,5 +1,5 @@
 [Unit]
-Description=xGov Committee Service Runner
+Description=xGov Committees Service Runner
 After=network-online.target
 Wants=network-online.target
 
