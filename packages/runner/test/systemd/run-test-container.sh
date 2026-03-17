@@ -49,6 +49,20 @@ assert_failed() {
   fi
 }
 
+assert_condition_failed() {
+  local condition_result active_state
+  condition_result=$(exec_container systemctl show -p ConditionResult runner.service | cut -d= -f2)
+  active_state=$(exec_container systemctl show -p ActiveState runner.service | cut -d= -f2)
+  if [ "$condition_result" != "no" ]; then
+    echo "FAIL: expected ConditionResult=no, got '$condition_result'"
+    exit 1
+  fi
+  if [ "$active_state" != "inactive" ]; then
+    echo "FAIL: expected ActiveState=inactive, got '$active_state'"
+    exit 1
+  fi
+}
+
 assert_log() {
   if ! exec_container journalctl -u runner.service --no-pager 2>&1 | grep -q "$1"; then
     echo "FAIL: expected log line '$1' not found"
@@ -156,8 +170,17 @@ case "$TEST_SCENARIO" in
     echo "Failure test passed."
     ;;
 
+  condition)
+    # Verify ConditionPathExists= prevents start with a clear condition failure (not a crash).
+    exec_container rm /opt/xgov-committees/.env
+    exec_container systemctl daemon-reload
+    exec_container systemctl start runner.service || true
+    assert_condition_failed
+    echo "Condition test passed."
+    ;;
+
   *)
-    echo "Usage: $0 [boot|stop|failure]"
+    echo "Usage: $0 [boot|stop|failure|condition]"
     exit 1
     ;;
 esac
