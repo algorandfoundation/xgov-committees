@@ -53,6 +53,8 @@ describe("runner", () => {
       PATH: `${fakeBinDir}:${process.env.PATH}`,
       STATE_DIR: stateDir,
       COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-default.js"),
+      SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN ?? "xoxb-test",
+      SLACK_CHANNEL_ID: process.env.SLACK_CHANNEL_ID ?? "C0TEST",
     };
   }
 
@@ -195,18 +197,27 @@ describe("runner", () => {
 describe("notify-slack", () => {
   const NOTIFY_SCRIPT = join(RUNNER_ROOT, "src", "notify-slack.ts");
 
+  function notifySlackEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
+    return {
+      ...process.env,
+      SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN ?? "xoxb-test",
+      SLACK_CHANNEL_ID: process.env.SLACK_CHANNEL_ID ?? "C0TEST",
+      ...overrides,
+    };
+  }
+
   it("exits 0 silently when service-result is success", () => {
     const result = spawnSync(
       "node",
       ["--import", "tsx/esm", NOTIFY_SCRIPT, "--exit-status", "0", "--service-result", "success", "--hostname", "test"],
-      { encoding: "utf8" },
+      { encoding: "utf8", env: notifySlackEnv() },
     );
     expect(result.status).toBe(0);
     expect(result.stdout).toBe("");
     expect(result.stderr).toBe("");
   });
 
-  it("logs warning and exits 1 when Slack env vars are missing and service-result is not success", () => {
+  it("exits 1 when Slack env vars are missing", () => {
     const result = spawnSync(
       "node",
       [
@@ -223,11 +234,14 @@ describe("notify-slack", () => {
       { encoding: "utf8", env: { ...process.env, SLACK_BOT_TOKEN: "", SLACK_CHANNEL_ID: "" } },
     );
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("skipping notification");
+    expect(result.stderr).toContain("SLACK_BOT_TOKEN and SLACK_CHANNEL_ID must be set");
   });
 
   it("exits 1 when required args are missing", () => {
-    const result = spawnSync("node", ["--import", "tsx/esm", NOTIFY_SCRIPT], { encoding: "utf8" });
+    const result = spawnSync("node", ["--import", "tsx/esm", NOTIFY_SCRIPT], {
+      encoding: "utf8",
+      env: notifySlackEnv(),
+    });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("Missing required argument");
   });

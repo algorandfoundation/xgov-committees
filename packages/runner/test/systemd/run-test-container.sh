@@ -150,7 +150,7 @@ case "$TEST_SCENARIO" in
     if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_CHANNEL_ID:-}" ]; then
       assert_log "notify-slack: notification posted"
     else
-      assert_log "skipping notification"
+      assert_log "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID must be set"
     fi
 
     echo "Failure test passed."
