@@ -16,9 +16,9 @@
     "test:coverage": "vitest run --coverage",
     "test:unit": "bash test/unit/run-unit.sh",
     "test:integration": "vitest run test/integration",
-    "test:integration:slack": "dotenv -e .env -- vitest run test/integration",
-    "test:systemd": "bash test/systemd/run-test-container.sh boot && bash test/systemd/run-test-container.sh stop && bash test/systemd/run-test-container.sh failure",
-    "test:systemd:slack": "dotenv -e .env -- bash test/systemd/run-test-container.sh failure"
+    "test:integration:slack": "dotenv -e ../../.env -- vitest run test/integration",
+    "test:systemd": "bash test/systemd/run-test-container.sh boot && bash test/systemd/run-test-container.sh stop && bash test/systemd/run-test-container.sh failure && bash test/systemd/run-test-container.sh condition",
+    "test:systemd:slack": "dotenv -e ../../.env -- bash test/systemd/run-test-container.sh failure"
   },
   "dependencies": {
     "@algorandfoundation/algokit-utils": "^9.2.0",

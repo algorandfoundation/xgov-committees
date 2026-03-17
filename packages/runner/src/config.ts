@@ -1,6 +1,4 @@
-import dotenv from "dotenv";
-
-dotenv.config({ quiet: true });
+import "./env.ts";
 
 export interface Config {
   algodServer: string;
