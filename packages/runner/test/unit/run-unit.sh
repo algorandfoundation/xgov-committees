@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Called by `npm run test:unit`.
+# Called by `pnpm run test:unit`.
 # On Linux: runs vitest natively (unix_dgram + systemd-analyze are available).
 # Elsewhere: builds a Linux+Node container and runs vitest inside it.
 

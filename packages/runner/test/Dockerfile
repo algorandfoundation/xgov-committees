@@ -12,17 +12,20 @@ RUN useradd --system --no-create-home xgov-committees-runner
 
 WORKDIR /opt/xgov-committees
 
+# Enable pnpm via corepack (Node 22 ships with corepack)
+RUN corepack enable
+
 # Install runner dependencies using the workspace root lock file.
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/runner/package.json packages/runner/
-RUN npm ci --workspace=packages/runner
+RUN pnpm install --frozen-lockfile --filter xgov-committees-runner
 
 WORKDIR /opt/xgov-committees/packages/runner
 COPY packages/runner/ .
 
 # ── unit-test ─────────────────────────────────────────────────────────────────
 FROM base AS unit-test
-CMD ["node_modules/.bin/vitest", "run", "test/unit"]
+CMD ["pnpm", "exec", "vitest", "run", "test/unit"]
 
 # ── systemd-integration ──────────────────────────────────────────────────────
 FROM base AS systemd-integration
@@ -31,7 +34,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends systemd-sysv \
  && rm -rf /var/lib/apt/lists/*
 
-RUN npm run build
+RUN pnpm run build
 
 # Simulate the committee generator (the real one is deployed separately).
 RUN mkdir -p /opt/xgov-committees/packages/committee-generator/dist

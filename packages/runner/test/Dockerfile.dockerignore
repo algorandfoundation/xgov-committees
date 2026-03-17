@@ -1,4 +1,4 @@
-# Build context is the workspace root (needed for the root package-lock.json).
+# Build context is the workspace root (needed for the root pnpm-lock.yaml).
 # Paths are relative to the workspace root.
 node_modules
 **/node_modules
