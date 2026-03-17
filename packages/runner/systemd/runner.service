@@ -2,11 +2,13 @@
 Description=xGov Committees Service Runner
 After=network-online.target
 Wants=network-online.target
+ConditionPathExists=/opt/xgov-committees/.env
 
 [Service]
 Type=notify
 NotifyAccess=all
 WorkingDirectory=/opt/xgov-committees/packages/runner
+EnvironmentFile=/opt/xgov-committees/.env
 ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
 ExecStopPost=-/usr/bin/node /opt/xgov-committees/packages/runner/dist/notify-slack.js --exit-status=${EXIT_STATUS} --service-result=${SERVICE_RESULT} --hostname=%H
 WatchdogSec=65
