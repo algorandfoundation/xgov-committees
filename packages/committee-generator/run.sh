@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-pnpm tsx src/index.ts $@
+pnpm exec tsx src/index.ts "$@"

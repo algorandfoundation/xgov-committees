@@ -29,6 +29,6 @@
   },
   "type": "module",
   "pnpm": {
-    "ignoredBuiltDependencies": ["cpu-features", "esbuild", "protobufjs", "ssh2"]
+    "onlyBuiltDependencies": []
   }
 }
