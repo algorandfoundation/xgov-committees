@@ -11,12 +11,6 @@ Wants=network-online.target
 
 The service makes HTTP requests to algod. Both configs are needed: `Wants=` ensures the network target is activated, and `After=` ensures the service starts only after network is ready.
 
-```ini
-ConditionPathExists=/opt/xgov-committees/.env
-```
-
-Prevents the service from starting if the env file is missing, producing a clear `systemctl status` message. The file must exist at `/opt/xgov-committees/.env` before the unit is started (or before the timer first triggers it).
-
 ### Service
 
 ```ini
@@ -47,7 +41,9 @@ Sets the cwd for the process. Required for relative path references at runtime.
 EnvironmentFile=/opt/xgov-committees/.env
 ```
 
-Loads environment variables from the repo root `.env` before Node starts. See `.env.example` at the repo root for the full list of required variables. The `dotenv` calls in the Node source are a fallback for non-systemd invocations (local dev, `node dist/index.js` outside systemd) and are redundant when the service runs under systemd.
+Loads environment variables from the repo root `.env` before Node starts. The file is non-optional (no `-` prefix). If it is missing, systemd fails during environment setup before `ExecStart` runs, and the unit enters `failed` state. See `.env.example` at the repo root for the full list of required variables. The `dotenv` calls in the Node source are a fallback for non-systemd invocations and are redundant when the service runs under systemd.
+
+
 
 ```ini
 ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js
