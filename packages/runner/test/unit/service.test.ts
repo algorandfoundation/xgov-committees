@@ -10,6 +10,7 @@ import { type Config } from "../../src/config.ts";
 import { waitForBlock, runWriteCache, run, getActiveChild } from "../../src/service.ts";
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
+vi.mock("node:timers/promises", () => ({ setTimeout: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("../../src/state.ts", () => ({ loadState: vi.fn(), saveState: vi.fn() }));
 vi.mock("@algorandfoundation/algokit-utils", () => ({
   AlgorandClient: { fromConfig: vi.fn() },

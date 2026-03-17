@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { setTimeout } from "node:timers/promises";
 import { spawn, type ChildProcess } from "node:child_process";
 import { AlgorandClient } from "@algorandfoundation/algokit-utils";
 import { type Config } from "./config.ts";
@@ -66,6 +67,7 @@ export async function waitForBlock(algorand: AlgorandClient, targetRound: number
       if (Number(status.lastRound) >= targetRound) return;
     } catch (err) {
       console.warn(`waitForBlock: algod error, retrying (${err instanceof Error ? err.message : err})`);
+      await setTimeout(2_000);
     }
   }
 }
