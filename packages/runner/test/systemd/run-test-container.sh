@@ -125,11 +125,7 @@ case "$TEST_SCENARIO" in
   failure)
     # Override generator with the fatal fixture to force the service to fail.
     exec_container mkdir -p /etc/systemd/system/runner.service.d
-    exec_container sh -c \
-      'printf "[Service]\nEnvironment=COMMITTEE_GENERATOR_PATH=/opt/xgov-committees/packages/committee-generator/dist/generator-fatal.js\nEnvironmentFile=-/etc/xgov-committees-runner.env\n" \
-      > /etc/systemd/system/runner.service.d/override.conf'
-
-    # Write Slack credentials into the container's env file if provided by the caller.
+    # Write Slack credentials into a secondary env file if provided by the caller.
     # exec_container doesn't support -e; using docker exec directly to avoid shell-escaping the secrets.
     if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_CHANNEL_ID:-}" ]; then
       docker exec \
@@ -138,7 +134,16 @@ case "$TEST_SCENARIO" in
         "$CONTAINER" sh -c \
         'printf "SLACK_BOT_TOKEN=%s\nSLACK_CHANNEL_ID=%s\n" "$SLACK_BOT_TOKEN" "$SLACK_CHANNEL_ID" \
         > /etc/xgov-committees-runner.env'
+      SLACK_OVERRIDE='EnvironmentFile=-/etc/xgov-committees-runner.env'
+    else
+      # Strip the dummy Slack creds baked into .env so notify-slack reports them as missing.
+      exec_container sh -c "sed -i '/^SLACK_BOT_TOKEN=\|^SLACK_CHANNEL_ID=/d' /opt/xgov-committees/packages/runner/.env"
+      SLACK_OVERRIDE=''
     fi
+
+    exec_container sh -c \
+      "printf '[Service]\nEnvironment=COMMITTEE_GENERATOR_PATH=/opt/xgov-committees/packages/committee-generator/dist/generator-fatal.js\n${SLACK_OVERRIDE:+${SLACK_OVERRIDE}\n}' \
+      > /etc/systemd/system/runner.service.d/override.conf"
 
     exec_container systemctl daemon-reload
 
