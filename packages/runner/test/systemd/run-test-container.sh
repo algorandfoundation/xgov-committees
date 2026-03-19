@@ -50,9 +50,11 @@ assert_failed() {
 }
 
 assert_log() {
-  if ! exec_container journalctl -u runner.service --no-pager 2>&1 | grep -q "$1"; then
-    echo "FAIL: expected log line '$1' not found"
-    exit 1
+  if ! exec_container systemctl status -n 50 runner.service --no-pager 2>&1 | grep -q "$1"; then
+    if ! exec_container journalctl -u runner.service --no-pager 2>&1 | grep -q "$1"; then
+      echo "FAIL: expected log line '$1' not found"
+      exit 1
+    fi
   fi
 }
 
