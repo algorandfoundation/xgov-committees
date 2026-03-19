@@ -2,6 +2,7 @@ import "./env.ts";
 
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
+import { config } from "./config.ts";
 import { isFailure, postFailureNotification } from "./slack.ts";
 
 const argv = await yargs(hideBin(process.argv))
@@ -13,22 +14,14 @@ const argv = await yargs(hideBin(process.argv))
 
 if (!isFailure(argv.serviceResult)) process.exit(0);
 
-const slackBotToken = process.env.SLACK_BOT_TOKEN;
-const slackChannelId = process.env.SLACK_CHANNEL_ID;
-
-if (!slackBotToken || !slackChannelId) {
-  console.error("notify-slack: SLACK_BOT_TOKEN and SLACK_CHANNEL_ID are not set — skipping notification");
-  process.exit(1);
-}
-
 try {
   await postFailureNotification({
     exitStatus: argv.exitStatus,
     serviceResult: argv.serviceResult,
     hostname: argv.hostname,
     unitName: "runner.service",
-    slackBotToken,
-    slackChannelId,
+    slackBotToken: config.slackBotToken,
+    slackChannelId: config.slackChannelId,
   });
   console.log("notify-slack: notification posted");
 } catch (error) {

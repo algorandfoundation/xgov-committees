@@ -7,9 +7,11 @@ export interface Config {
   registryAppId: number;
   stateDir: string;
   committeeGeneratorPath: string;
+  slackBotToken: string;
+  slackChannelId: string;
 }
 
-const DEFAULT_CONFIG: Config = {
+const DEFAULT_CONFIG: Omit<Config, "slackBotToken" | "slackChannelId"> = {
   algodServer: "https://mainnet-api.4160.nodely.dev",
   algodPort: 443,
   algodToken: "",
@@ -18,6 +20,13 @@ const DEFAULT_CONFIG: Config = {
   committeeGeneratorPath: "/opt/xgov-committees/packages/committee-generator/dist/index.js",
 };
 
+const slackBotToken = process.env.SLACK_BOT_TOKEN;
+const slackChannelId = process.env.SLACK_CHANNEL_ID;
+
+if (!slackBotToken || !slackChannelId) {
+  throw new Error("SLACK_BOT_TOKEN and SLACK_CHANNEL_ID must be set");
+}
+
 export const config: Config = {
   algodServer: process.env.ALGOD_SERVER ?? DEFAULT_CONFIG.algodServer,
   algodPort: process.env.ALGOD_PORT ? parseInt(process.env.ALGOD_PORT, 10) : DEFAULT_CONFIG.algodPort,
@@ -25,4 +34,6 @@ export const config: Config = {
   registryAppId: process.env.REGISTRY_APP_ID ? parseInt(process.env.REGISTRY_APP_ID, 10) : DEFAULT_CONFIG.registryAppId,
   stateDir: process.env.STATE_DIR ?? DEFAULT_CONFIG.stateDir,
   committeeGeneratorPath: process.env.COMMITTEE_GENERATOR_PATH ?? DEFAULT_CONFIG.committeeGeneratorPath,
+  slackBotToken,
+  slackChannelId,
 };
