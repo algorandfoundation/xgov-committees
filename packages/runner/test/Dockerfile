@@ -1,8 +1,9 @@
-FROM node:22-slim AS base
+FROM node:22-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     systemd \
+    systemd-sysv \
  && rm -rf /var/lib/apt/lists/*
 
 # node:22-slim installs to /usr/local/bin/node; runner.service expects /usr/bin/node.
@@ -22,17 +23,6 @@ RUN pnpm install --frozen-lockfile --filter xgov-committees-runner
 
 WORKDIR /opt/xgov-committees/packages/runner
 COPY packages/runner/ .
-
-# ── unit-test ─────────────────────────────────────────────────────────────────
-FROM base AS unit-test
-CMD ["pnpm", "exec", "vitest", "run", "test/unit"]
-
-# ── systemd-integration ──────────────────────────────────────────────────────
-FROM base AS systemd-integration
-
-RUN apt-get update \
- && apt-get install -y --no-install-recommends systemd-sysv \
- && rm -rf /var/lib/apt/lists/*
 
 RUN pnpm run build
 

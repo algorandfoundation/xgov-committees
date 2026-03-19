@@ -3,7 +3,7 @@
 # Builds a privileged systemd+Node.js container, starts it with systemd as PID 1,
 # and runs the requested test scenario.
 #
-# Usage: run-test-container.sh [boot|stop|failure]
+# Usage: run-test-container.sh [boot|stop|failure|no-env|verify]
 
 set -euo pipefail
 
@@ -72,7 +72,7 @@ trap cleanup EXIT
 
 # ── Container setup ───────────────────────────────────────────────────────────
 
-docker build --target systemd-integration -t "$IMAGE" \
+docker build -t "$IMAGE" \
   -f "$SCRIPT_DIR/../Dockerfile" \
   "$WORKSPACE_ROOT" 2>&1
 
@@ -98,6 +98,14 @@ done
 # ── Test scenarios ────────────────────────────────────────────────────────────
 
 case "$TEST_SCENARIO" in
+  verify)
+    # Static lint: catches syntax errors, unknown directives, deprecated options, bad ExecStart paths.
+    exec_container systemd-analyze verify --man=no \
+      /etc/systemd/system/runner.service \
+      /etc/systemd/system/runner.timer
+    echo "Verify test passed."
+    ;;
+
   boot)
     exec_container systemctl start runner.timer
     wait_for Result "success|failed" 30
@@ -173,7 +181,7 @@ case "$TEST_SCENARIO" in
     ;;
 
   *)
-    echo "Usage: $0 [boot|stop|failure|no-env]"
+    echo "Usage: $0 [verify|boot|stop|failure|no-env]"
     exit 1
     ;;
 esac
