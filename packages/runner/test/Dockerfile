@@ -1,8 +1,9 @@
-FROM node:22-slim AS base
+FROM node:22-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     systemd \
+    systemd-sysv \
  && rm -rf /var/lib/apt/lists/*
 
 # node:22-slim installs to /usr/local/bin/node; runner.service expects /usr/bin/node.
@@ -23,17 +24,6 @@ RUN pnpm install --frozen-lockfile --filter xgov-committees-runner
 WORKDIR /opt/xgov-committees/packages/runner
 COPY packages/runner/ .
 
-# ── unit-test ─────────────────────────────────────────────────────────────────
-FROM base AS unit-test
-CMD ["pnpm", "exec", "vitest", "run", "test/unit"]
-
-# ── systemd-integration ──────────────────────────────────────────────────────
-FROM base AS systemd-integration
-
-RUN apt-get update \
- && apt-get install -y --no-install-recommends systemd-sysv \
- && rm -rf /var/lib/apt/lists/*
-
 RUN pnpm run build
 
 # Simulate the committee generator (the real one is deployed separately).
@@ -45,7 +35,8 @@ COPY packages/runner/test/fixtures/generator-graceful-exit.mjs \
 COPY packages/runner/test/fixtures/generator-fatal.js \
      /opt/xgov-committees/packages/committee-generator/dist/generator-fatal.js
 
-RUN touch /opt/xgov-committees/.env
+# Create a minimal .env with dummy Slack creds so EnvironmentFile= and config.ts succeed.
+RUN printf 'SLACK_BOT_TOKEN=xoxb-test\nSLACK_CHANNEL_ID=C0TEST\n' > /opt/xgov-committees/.env
 
 RUN chown -R root:xgov-committees-runner /opt/xgov-committees \
  && chmod -R u=rwX,g=rX,o= /opt/xgov-committees
