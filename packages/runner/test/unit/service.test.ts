@@ -11,6 +11,7 @@ import { waitForBlock, runWriteCache, run, getActiveChild } from "../../src/serv
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 vi.mock("../../src/state.ts", () => ({ loadState: vi.fn(), saveState: vi.fn() }));
+vi.mock("../../src/config.ts", () => ({}));
 vi.mock("@algorandfoundation/algokit-utils", () => ({
   AlgorandClient: { fromConfig: vi.fn() },
 }));
@@ -258,6 +259,8 @@ describe("run", () => {
       registryAppId: 999,
       stateDir,
       committeeGeneratorPath: "/fake/generator.js",
+      slackBotToken: "xoxb-test",
+      slackChannelId: "C0TEST",
     };
   }
 
