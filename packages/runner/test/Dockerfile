@@ -42,7 +42,7 @@ COPY packages/runner/test/fixtures/generator-graceful-exit.mjs \
 COPY packages/runner/test/fixtures/generator-fatal.js \
      /opt/xgov-committees/packages/committee-generator/dist/generator-fatal.js
 
-# Create a minimal .env with dummy Slack creds so dotenv + config.ts succeed.
+# Create a minimal .env with dummy Slack creds so EnvironmentFile= and config.ts succeed.
 RUN printf 'SLACK_BOT_TOKEN=xoxb-test\nSLACK_CHANNEL_ID=C0TEST\n' > /opt/xgov-committees/.env
 
 RUN chown -R root:xgov-committees-runner /opt/xgov-committees \
