@@ -1,0 +1,5 @@
+pnpm run format:check
+# TODO: replace with `pnpm run lint`
+pnpm --filter xgov-committees-runner run lint
+# TODO: replace with `pnpm run build`
+pnpm --filter xgov-committees-runner run build
