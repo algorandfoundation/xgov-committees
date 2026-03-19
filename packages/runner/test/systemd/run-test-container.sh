@@ -49,20 +49,6 @@ assert_failed() {
   fi
 }
 
-assert_condition_failed() {
-  local condition_result active_state
-  condition_result=$(exec_container systemctl show -p ConditionResult runner.service | cut -d= -f2)
-  active_state=$(exec_container systemctl show -p ActiveState runner.service | cut -d= -f2)
-  if [ "$condition_result" != "no" ]; then
-    echo "FAIL: expected ConditionResult=no, got '$condition_result'"
-    exit 1
-  fi
-  if [ "$active_state" != "inactive" ]; then
-    echo "FAIL: expected ActiveState=inactive, got '$active_state'"
-    exit 1
-  fi
-}
-
 assert_log() {
   if ! exec_container journalctl -u runner.service --no-pager 2>&1 | grep -q "$1"; then
     echo "FAIL: expected log line '$1' not found"
@@ -139,11 +125,7 @@ case "$TEST_SCENARIO" in
   failure)
     # Override generator with the fatal fixture to force the service to fail.
     exec_container mkdir -p /etc/systemd/system/runner.service.d
-    exec_container sh -c \
-      'printf "[Service]\nEnvironment=COMMITTEE_GENERATOR_PATH=/opt/xgov-committees/packages/committee-generator/dist/generator-fatal.js\nEnvironmentFile=-/etc/xgov-committees-runner.env\n" \
-      > /etc/systemd/system/runner.service.d/override.conf'
-
-    # Write Slack credentials into the container's env file if provided by the caller.
+    # Write Slack credentials into a secondary env file if provided by the caller.
     # exec_container doesn't support -e; using docker exec directly to avoid shell-escaping the secrets.
     if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_CHANNEL_ID:-}" ]; then
       docker exec \
@@ -152,7 +134,16 @@ case "$TEST_SCENARIO" in
         "$CONTAINER" sh -c \
         'printf "SLACK_BOT_TOKEN=%s\nSLACK_CHANNEL_ID=%s\n" "$SLACK_BOT_TOKEN" "$SLACK_CHANNEL_ID" \
         > /etc/xgov-committees-runner.env'
+      SLACK_OVERRIDE='EnvironmentFile=-/etc/xgov-committees-runner.env'
+    else
+      # Strip the dummy Slack creds baked into .env so notify-slack reports them as missing.
+      exec_container sh -c "sed -i '/^SLACK_BOT_TOKEN=\|^SLACK_CHANNEL_ID=/d' /opt/xgov-committees/.env"
+      SLACK_OVERRIDE=''
     fi
+
+    exec_container sh -c \
+      "printf '[Service]\nEnvironment=COMMITTEE_GENERATOR_PATH=/opt/xgov-committees/packages/committee-generator/dist/generator-fatal.js\n${SLACK_OVERRIDE:+${SLACK_OVERRIDE}\n}' \
+      > /etc/systemd/system/runner.service.d/override.conf"
 
     exec_container systemctl daemon-reload
 
@@ -164,23 +155,25 @@ case "$TEST_SCENARIO" in
     if [ -n "${SLACK_BOT_TOKEN:-}" ] && [ -n "${SLACK_CHANNEL_ID:-}" ]; then
       assert_log "notify-slack: notification posted"
     else
-      assert_log "skipping notification"
+      assert_log "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID must be set"
     fi
 
     echo "Failure test passed."
     ;;
 
-  condition)
-    # Verify ConditionPathExists= prevents start with a clear condition failure (not a crash).
+  no-env)
+    # Verify a missing .env causes a hard failure (not a silent skip).
     exec_container rm /opt/xgov-committees/.env
     exec_container systemctl daemon-reload
     exec_container systemctl start runner.service || true
-    assert_condition_failed
-    echo "Condition test passed."
+    wait_for ActiveState "failed" 15
+    assert_failed
+    assert_log "Failed to load environment files"
+    echo "No-env test passed."
     ;;
 
   *)
-    echo "Usage: $0 [boot|stop|failure|condition]"
+    echo "Usage: $0 [boot|stop|failure|no-env]"
     exit 1
     ;;
 esac
