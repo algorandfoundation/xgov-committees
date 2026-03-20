@@ -3,8 +3,7 @@ import { config } from './config';
 import { algod, networkMetadata } from './algod';
 import { subtractCached, getCache, setCache } from './cache';
 import { chunk, clearLine, formatDuration, sleep } from './utils';
-import { BlockHeader } from 'algosdk';
-import { BlockResponse } from 'algosdk/dist/types/client/v2/algod/models/types';
+import { BlockHeader, modelsv2 } from 'algosdk';
 import { guardWhileNotShuttingDown, fatalError } from './shutdown';
 
 /**
@@ -122,7 +121,7 @@ const _getBlock = async (rnd: number, skipCache: boolean = false): Promise<Block
     }
   }
 
-  let data: BlockResponse;
+  let data: modelsv2.BlockResponse;
 
   try {
     data = await algod.block(rnd).headerOnly(true).do();
