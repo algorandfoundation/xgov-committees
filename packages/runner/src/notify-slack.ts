@@ -1,4 +1,5 @@
-import "dotenv/config";
+import "./env.ts";
+
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { config } from "./config.ts";

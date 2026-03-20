@@ -35,7 +35,15 @@ If no `WATCHDOG=1` ping is received within 65 seconds, systemd kills the process
 WorkingDirectory=/opt/xgov-committees/packages/runner
 ```
 
-Sets the cwd for the process. Needed for `dotenv` to resolve `.env` files and relative path references.
+Sets the cwd for the process. Required for relative path references at runtime.
+
+```ini
+EnvironmentFile=/opt/xgov-committees/.env
+```
+
+Loads environment variables from the repo root `.env` before Node starts. The file is non-optional (no `-` prefix). If it is missing, systemd fails during environment setup before `ExecStart` runs, and the unit enters `failed` state. See `.env.example` at the repo root for the full list of required variables. The `dotenv` calls in the Node source are a fallback for non-systemd invocations and are redundant when the service runs under systemd.
+
+
 
 ```ini
 ExecStart=/usr/bin/node /opt/xgov-committees/packages/runner/dist/index.js

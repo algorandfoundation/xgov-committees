@@ -137,7 +137,7 @@ case "$TEST_SCENARIO" in
       SLACK_OVERRIDE='EnvironmentFile=-/etc/xgov-committees-runner.env'
     else
       # Strip the dummy Slack creds baked into .env so notify-slack reports them as missing.
-      exec_container sh -c "sed -i '/^SLACK_BOT_TOKEN=\|^SLACK_CHANNEL_ID=/d' /opt/xgov-committees/packages/runner/.env"
+      exec_container sh -c "sed -i '/^SLACK_BOT_TOKEN=\|^SLACK_CHANNEL_ID=/d' /opt/xgov-committees/.env"
       SLACK_OVERRIDE=''
     fi
 
@@ -161,8 +161,19 @@ case "$TEST_SCENARIO" in
     echo "Failure test passed."
     ;;
 
+  no-env)
+    # Verify a missing .env causes a hard failure (not a silent skip).
+    exec_container rm /opt/xgov-committees/.env
+    exec_container systemctl daemon-reload
+    exec_container systemctl start runner.service || true
+    wait_for ActiveState "failed" 15
+    assert_failed
+    assert_log "Failed to load environment files"
+    echo "No-env test passed."
+    ;;
+
   *)
-    echo "Usage: $0 [boot|stop|failure]"
+    echo "Usage: $0 [boot|stop|failure|no-env]"
     exit 1
     ;;
 esac
