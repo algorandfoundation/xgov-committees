@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { PutObjectCommand, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files';
 import { createCommitteeFixture, getExpectedKey, cleanupS3Prefix } from './helpers';
 import type { Committee } from '../../src/committee';
@@ -188,5 +188,95 @@ describe('ensureCommitteeShortcuts', () => {
     );
 
     expect(listResult.Contents).toHaveLength(4);
+  });
+
+  it('should generate index.json with correct structure and data', async () => {
+    const { s3Client } = getGlobalLocalStack();
+
+    // Create 2 committees with different data
+    const committee1 = createCommitteeFixture(55000000, 58000000);
+    const committee2 = createCommitteeFixture(55005000, 58005000);
+
+    committeeStore.set('55000000-58000000', committee1);
+    committeeStore.set('55005000-58005000', committee2);
+
+    // Upload committee files to S3
+    const key1 = getExpectedKey('committee/55000000-58000000.json');
+    const key2 = getExpectedKey('committee/55005000-58005000.json');
+
+    await Promise.all([
+      s3Client.send(
+        new PutObjectCommand({
+          Bucket: TEST_BUCKET_NAME,
+          Key: key1,
+          Body: JSON.stringify(committee1),
+        }),
+      ),
+      s3Client.send(
+        new PutObjectCommand({
+          Bucket: TEST_BUCKET_NAME,
+          Key: key2,
+          Body: JSON.stringify(committee2),
+        }),
+      ),
+    ]);
+
+    // Run the function
+    const { ensureCommitteeShortcuts } = await import('../../src/s3');
+    await ensureCommitteeShortcuts();
+
+    // Fetch index.json
+    const indexKey = getExpectedKey('committee/index.json');
+    const getResult = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: TEST_BUCKET_NAME,
+        Key: indexKey,
+      }),
+    );
+
+    // Parse the JSON
+    const body = await getResult.Body?.transformToString();
+    if (!body) {
+      throw new Error(`Expected S3 object body for key "${indexKey}", but got none`);
+    }
+    const index = JSON.parse(body);
+
+    // Validate structure
+    expect(index).toHaveProperty('committees');
+    expect(index).toHaveProperty('lastUpdated');
+    expect(index).toHaveProperty('totalCommittees');
+    expect(typeof index.committees).toBe('object');
+    expect(Array.isArray(index.committees)).toBe(false); // Should be object, not array
+
+    // Validate committees object is keyed by toRound
+    const committeeKeys = Object.keys(index.committees);
+    expect(committeeKeys).toContain('58000000');
+    expect(committeeKeys).toContain('58005000');
+    expect(committeeKeys).toHaveLength(2);
+
+    // Validate sorting order (by toRound ascending)
+    const sortedKeys = committeeKeys.map(Number).sort((a, b) => a - b);
+    expect(committeeKeys.map(Number)).toEqual(sortedKeys);
+
+    // Validate first committee entry
+    const entry1 = index.committees['58000000'];
+    expect(entry1.fromRound).toBe(55000000);
+    expect(entry1.toRound).toBe(58000000);
+    expect(entry1.totalMembers).toBe(committee1.totalMembers);
+    expect(entry1.totalVotes).toBe(committee1.totalVotes);
+    expect(typeof entry1.committeeId).toBe('string');
+    expect(entry1.committeeId.length).toBeGreaterThan(0);
+
+    // Validate second committee entry
+    const entry2 = index.committees['58005000'];
+    expect(entry2.fromRound).toBe(55005000);
+    expect(entry2.toRound).toBe(58005000);
+    expect(entry2.totalMembers).toBe(committee2.totalMembers);
+    expect(entry2.totalVotes).toBe(committee2.totalVotes);
+    expect(typeof entry2.committeeId).toBe('string');
+
+    // Validate metadata
+    expect(index.totalCommittees).toBe(2);
+    expect(new Date(index.lastUpdated).getTime()).toBeLessThanOrEqual(Date.now());
   });
 });
