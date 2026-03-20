@@ -10,6 +10,8 @@ const CONFIG_KEYS = [
   "REGISTRY_APP_ID",
   "STATE_DIR",
   "COMMITTEE_GENERATOR_PATH",
+  "SLACK_BOT_TOKEN",
+  "SLACK_CHANNEL_ID",
 ] as const;
 
 describe("config env var branches", () => {
@@ -37,6 +39,9 @@ describe("config env var branches", () => {
     vi.resetModules();
 
     for (const k of CONFIG_KEYS) delete process.env[k];
+    // Slack creds are required
+    process.env.SLACK_BOT_TOKEN = "xoxb-test";
+    process.env.SLACK_CHANNEL_ID = "C0TEST";
 
     const { config } = await import("../../src/config.ts");
     expect(config.algodServer).toBe("https://mainnet-api.4160.nodely.dev");
@@ -45,6 +50,17 @@ describe("config env var branches", () => {
     expect(config.registryAppId).toBe(3147789458);
     expect(config.stateDir).toBe("/var/lib/xgov-committees-runner");
     expect(config.committeeGeneratorPath).toBe("/opt/xgov-committees/packages/committee-generator/dist/index.js");
+    expect(config.slackBotToken).toBe("xoxb-test");
+    expect(config.slackChannelId).toBe("C0TEST");
+  });
+
+  it("throws when Slack creds are missing", async () => {
+    vi.doMock("dotenv", () => ({ default: { config: vi.fn() } }));
+    vi.resetModules();
+
+    for (const k of CONFIG_KEYS) delete process.env[k];
+
+    await expect(import("../../src/config.ts")).rejects.toThrow("SLACK_BOT_TOKEN and SLACK_CHANNEL_ID must be set");
   });
 
   it("reads all values from env vars when they are set", async () => {
@@ -54,6 +70,8 @@ describe("config env var branches", () => {
     process.env.REGISTRY_APP_ID = "12345";
     process.env.STATE_DIR = "/custom/state";
     process.env.COMMITTEE_GENERATOR_PATH = "/custom/generator.js";
+    process.env.SLACK_BOT_TOKEN = "xoxb-real";
+    process.env.SLACK_CHANNEL_ID = "C0REAL";
 
     vi.resetModules();
 
@@ -64,5 +82,7 @@ describe("config env var branches", () => {
     expect(config.registryAppId).toBe(12345);
     expect(config.stateDir).toBe("/custom/state");
     expect(config.committeeGeneratorPath).toBe("/custom/generator.js");
+    expect(config.slackBotToken).toBe("xoxb-real");
+    expect(config.slackChannelId).toBe("C0REAL");
   });
 });
