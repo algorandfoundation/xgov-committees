@@ -12,12 +12,12 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write . --ignore-path ../../.prettierignore",
     "format:check": "prettier --check . --ignore-path ../../.prettierignore",
-    "test": "npm run test:unit && npm run test:integration",
+    "test": "pnpm run test:unit && pnpm run test:integration",
     "test:coverage": "vitest run --coverage",
-    "test:unit": "bash test/unit/run-unit.sh",
+    "test:unit": "vitest run test/unit",
     "test:integration": "vitest run test/integration",
     "test:integration:slack": "dotenv -e ../../.env -- vitest run test/integration",
-    "test:systemd": "bash test/systemd/run-test-container.sh boot && bash test/systemd/run-test-container.sh stop && bash test/systemd/run-test-container.sh failure && bash test/systemd/run-test-container.sh no-env",
+    "test:systemd": "bash test/systemd/run-test-container.sh verify && bash test/systemd/run-test-container.sh boot && bash test/systemd/run-test-container.sh stop && bash test/systemd/run-test-container.sh failure && bash test/systemd/run-test-container.sh no-env",
     "test:systemd:slack": "dotenv -e ../../.env -- bash test/systemd/run-test-container.sh failure"
   },
   "dependencies": {

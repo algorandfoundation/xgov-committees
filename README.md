@@ -32,24 +32,24 @@ xgov-committees/
 
 ## Workspace Setup
 
-This is an npm workspaces monorepo. All packages are located in the `packages/` directory.
+This is a pnpm workspaces monorepo. All packages are located in the `packages/` directory.
 
 ### Install Dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### Build
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 ### Test
 
 ```bash
-npm run test
+pnpm run test
 ```
 
 ## Key Packages

@@ -3,20 +3,18 @@
   "license": "ISC",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
+  "packageManager": "pnpm@10.28.2",
   "engines": {
     "node": ">=20.19.0"
   },
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
     "clean": "rm -rf packages/*/dist",
-    "lint": "npm run lint --workspaces --if-present",
-    "lint:fix": "npm run lint:fix --workspaces --if-present",
-    "format": "npm run format --workspaces --if-present",
-    "format:check": "npm run format:check --workspaces --if-present"
+    "lint": "pnpm -r run lint --if-present",
+    "lint:fix": "pnpm -r run lint:fix --if-present",
+    "format": "pnpm -r run format --if-present",
+    "format:check": "pnpm -r run format:check --if-present"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
