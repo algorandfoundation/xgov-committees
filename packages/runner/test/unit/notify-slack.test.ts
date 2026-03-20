@@ -1,6 +1,11 @@
-import type { SpawnSyncReturns } from "node:child_process";
+import { type SpawnSyncReturns, spawnSync } from "node:child_process";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { isFailure, getJournalTail, buildMessage, postFailureNotification } from "../../src/slack.ts";
+import { WebClient } from "@slack/web-api";
+
+const mockSpawnSync = vi.mocked(spawnSync);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const MockWebClient = WebClient as any;
 
 vi.mock("@slack/web-api", () => {
   const mockPostMessage = vi.fn().mockResolvedValue({ ok: true });
@@ -18,12 +23,6 @@ vi.mock("node:child_process", () => ({
     error: null,
   }),
 }));
-
-const { WebClient } = await import("@slack/web-api");
-const { spawnSync } = await import("node:child_process");
-const mockSpawnSync = vi.mocked(spawnSync);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const MockWebClient = WebClient as any;
 
 function makeSpawnResult(overrides: Partial<SpawnSyncReturns<string>>): SpawnSyncReturns<string> {
   return { pid: 0, output: [], stdout: "", stderr: "", status: 0, signal: null, error: undefined, ...overrides };
