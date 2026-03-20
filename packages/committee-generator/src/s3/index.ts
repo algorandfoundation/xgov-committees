@@ -198,6 +198,8 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
     fromRound: number;
     toRound: number;
     committeeId: string;
+    totalMembers: number;
+    totalVotes: number;
   }> = [];
 
   for (const key of keys) {
@@ -231,6 +233,8 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
         fromRound,
         toRound,
         committeeId: committeeID,
+        totalMembers: committee.totalMembers,
+        totalVotes: committee.totalVotes,
       });
 
       if (endRoundExists && committeeIDExists) {
@@ -294,11 +298,18 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
       console.log('Creating committee index file...');
     }
 
-    // Sort by fromRound for easier navigation
-    indexEntries.sort((a, b) => a.fromRound - b.fromRound);
+    // Sort by toRound for consistent ordering
+    indexEntries.sort((a, b) => a.toRound - b.toRound);
+
+    const committeesToRound = Object.fromEntries(
+      indexEntries.map(({ fromRound, toRound, committeeId, totalMembers, totalVotes }) => [
+        toRound,
+        { fromRound, toRound, committeeId, totalMembers, totalVotes },
+      ]),
+    );
 
     const indexData = {
-      committees: indexEntries,
+      committees: committeesToRound,
       lastUpdated: new Date().toISOString(),
       totalCommittees: indexEntries.length,
     };
