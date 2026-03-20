@@ -3,10 +3,37 @@ import { config } from './config';
 import { algod, networkMetadata } from './algod';
 import { subtractCached, getCache, setCache } from './cache';
 import { chunk, clearLine, formatDuration, sleep } from './utils';
-import { BlockHeader } from 'algosdk';
+import { BlockHeader, modelsv2 } from 'algosdk';
+import { guardWhileNotShuttingDown, fatalError } from './shutdown';
 
-export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
-  let total = rnds.length;
+/**
+ * Error thrown when attempting to fetch a block beyond the blockchain tip.
+ */
+export class TipReachedError extends Error {
+  constructor(public readonly blockNumber: bigint) {
+    super(`Block ${blockNumber} not available. The tip of the blockchain has been reached.`);
+    this.name = 'TipReachedError';
+  }
+}
+
+const DELTA_TOLERANCE = 5n;
+
+/**
+ * Determines whether a TipReachedError is a genuine tip condition or an unexpected failure.
+ * A genuine tip condition is when the requested block is within delta tolerance of lastRound.
+ * @returns true if within tolerance (expected), false if outside tolerance (unexpected error)
+ */
+export function isGenuineTipReached(
+  blockNumber: bigint,
+  lastRound: bigint,
+  deltaTolerance: bigint = DELTA_TOLERANCE,
+): boolean {
+  const delta = lastRound >= blockNumber ? lastRound - blockNumber : blockNumber - lastRound;
+  return delta <= deltaTolerance;
+}
+
+const _getBlocks = async (rnds: number[], skipCache: boolean = false) => {
+  const total = rnds.length;
   let v = '';
   const startBlock = rnds[0];
   const endBlock = rnds.at(-1);
@@ -28,19 +55,19 @@ export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
 
   const chunks = chunk(requiredRnds, 1_000);
   for (const chunk of chunks) {
-    try {
-      const start = Date.now();
-      await pMap(chunk, (rnd) => getBlockWithStatus(rnd), {
+    const start = Date.now();
+    await pMap(
+      chunk,
+      async (rnd) => {
+        return await getBlockWithStatus(rnd);
+      },
+      {
         concurrency: config.concurrency,
-      });
-      const end = Date.now();
-      const elapsed = end - start; // in ms
-      v = ((1000 * chunk.length) / elapsed).toFixed(2);
-    } catch (e) {
-      console.error(e);
-      await sleep(2000); // for fs flushing
-      process.exit(1);
-    }
+      },
+    );
+    const end = Date.now();
+    const elapsed = end - start; // in ms
+    v = ((1000 * chunk.length) / elapsed).toFixed(2);
 
     await sleep(50); // pause for gc
   }
@@ -49,7 +76,7 @@ export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   process.stdout.write(`Block data: \t${total} OK\n`);
 
   async function getBlockWithStatus(rnd: number): Promise<BlockHeader> {
-    const data = await getBlock(rnd, skipCache);
+    const data: BlockHeader = await getBlock(rnd, skipCache);
     processed++;
     const percent = ((100 * processed) / total).toFixed(2);
     const etaSec = (total - processed) / parseFloat(v);
@@ -62,7 +89,14 @@ export const getBlocks = async (rnds: number[], skipCache: boolean = false) => {
   }
 };
 
-export const getBlock = async (rnd: number, skipCache: boolean = false): Promise<BlockHeader> => {
+/**
+ * Fetch blocks from the Algorand node and cache them.
+ * Guarded by shutdown decorator to prevent starting during shutdown.
+ * If shutdown is initiated while fetching, throws ShuttingDownError.
+ */
+export const getBlocks: typeof _getBlocks = guardWhileNotShuttingDown(_getBlocks);
+
+const _getBlock = async (rnd: number, skipCache: boolean = false): Promise<BlockHeader> => {
   let cached: BlockHeader | undefined;
   if (!skipCache && (cached = await getCache(rnd))) {
     try {
@@ -87,8 +121,35 @@ export const getBlock = async (rnd: number, skipCache: boolean = false): Promise
     }
   }
 
-  // For other modes, fetch from algod and cache it
-  const data = await algod.block(rnd).headerOnly(true).do();
+  let data: modelsv2.BlockResponse;
+
+  try {
+    data = await algod.block(rnd).headerOnly(true).do();
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    // Check if block is not available (404 error from ledger)
+    if (errorMessage.includes('failed to retrieve information from the ledger')) {
+      const { lastRound } = await algod.status().do();
+      if (!isGenuineTipReached(BigInt(rnd), lastRound)) {
+        await fatalError(
+          new Error(
+            `Block ${rnd} request failed unexpectedly (lastRound: ${lastRound}, delta exceeds tolerance: ${DELTA_TOLERANCE})`,
+          ),
+        );
+      }
+      throw new TipReachedError(BigInt(rnd));
+    }
+
+    // rethrow other errors
+    throw e;
+  }
+
   setCache(rnd, data.block.header);
   return data.block.header;
 };
+
+/**
+ * Fetch a single block from the Algorand node and cache it.
+ * Guarded by shutdown decorator to prevent starting during shutdown.
+ */
+export const getBlock: typeof _getBlock = guardWhileNotShuttingDown(_getBlock);
