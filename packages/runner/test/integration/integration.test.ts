@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSyn
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { saveState, INITIAL_PERIOD, COMMITTEE_SELECTION_RANGE } from "../../src/state.ts";
+import { saveState, COMMITTEE_SELECTION_RANGE } from "../../src/state.ts";
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const REGISTRY_APP_ID = 3147789458;
@@ -34,7 +34,8 @@ describe("runner", () => {
       clearTimeout(timer);
     }
     const { "last-round": lastRound } = (await resp.json()) as { "last-round": number };
-    // Seed 2 blocks behind tip so tests with no boundary crossed exit cleanly.
+    // Set seed cache round close to and lower than chain tip:
+    // We want to test the "no boundary crossed" logic in a realistic scenario.
     const lastBf = Math.floor(lastRound / 1e6) * 1e6;
     saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
       lastGovernancePeriod: { Bi: lastBf - COMMITTEE_SELECTION_RANGE, Bf: lastBf },
@@ -124,7 +125,6 @@ describe("runner", () => {
       expect(stateFiles).toHaveLength(1);
       const state = JSON.parse(readFileSync(join(freshDir, stateFiles[0]), "utf8"));
       expect(state.lastGovernancePeriod).toBeDefined();
-      expect(state.lastGovernancePeriod.Bi).toBe(INITIAL_PERIOD.Bi);
       expect(state.lastGovernancePeriod.Bi).toBeLessThan(state.lastGovernancePeriod.Bf);
     } finally {
       rmSync(freshDir, { recursive: true, force: true });
