@@ -6,7 +6,7 @@ Triggered by a systemd timer every 50 minutes. See [systemd/README.md](systemd/R
 
 ## How it works
 
-Per [ARC-86](https://dev.algorand.co/arc-standards/arc-0086/), an xGov Committee is selected from a governance period `(Bi, Bf)` — the block range `[Bi; Bf)` from which xGov voting power is derived. Each xGov's voting power equals the number of blocks they proposed in that range. Consecutive governance periods shift by 1M blocks: `(Bi, Bf)` → `(Bi+1M, Bf+1M)`, with `Bf - Bi = 3M` blocks (the committee selection range).
+Per ARC-86, an xGov Committee is selected from a governance period `(Bi, Bf)` — the block range `[Bi; Bf)` from which xGov voting power is derived. Each xGov's voting power equals the number of blocks they proposed in that range. Consecutive governance periods shift by 1M blocks: `(Bi, Bf)` → `(Bi+1M, Bf+1M)`, with `Bf - Bi = 3M` blocks (the committee selection range). Once the chain passes `Bf`, the committee for that period can be computed and a new committee file is generated.
 
 The runner tracks the last fully processed governance period and warms the cache for the next one. On each invocation the service loop evaluates three ordered cases:
 
