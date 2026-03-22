@@ -17,6 +17,13 @@ CONTAINER="xgov-runner-systemd-test-$$"
 
 exec_container() { docker exec "$CONTAINER" "$@"; }
 
+# Seeds a state file inside the container. Pass --catch-up for catch-up scenarios.
+seed_state() {
+  exec_container node --import tsx/esm \
+    /opt/xgov-committees/packages/runner/test/fixtures/seed-state.ts "$@"
+  exec_container chown -R xgov-committees-runner:xgov-committees-runner /var/lib/xgov-committees-runner
+}
+
 # Poll a systemd property until it matches one of the expected values.
 # Usage: wait_for PROPERTY "val1|val2" [TIMEOUT=30]
 wait_for() {
@@ -109,14 +116,16 @@ case "$TEST_SCENARIO" in
     ;;
 
   boot)
+    seed_state
     exec_container systemctl start runner.timer
-    wait_for Result "success|failed" 30
+    sleep 5
     assert_result
     assert_log "Runner started successfully"
     echo "Boot test passed."
     ;;
 
   stop)
+    seed_state --catch-up
     # Override generator with the long-running graceful-exit fixture.
     exec_container mkdir -p /etc/systemd/system/runner.service.d
     exec_container sh -c \
@@ -133,6 +142,7 @@ case "$TEST_SCENARIO" in
     ;;
 
   failure)
+    seed_state --catch-up
     # Override generator with the fatal fixture to force the service to fail.
     exec_container mkdir -p /etc/systemd/system/runner.service.d
     # Write Slack credentials into a secondary env file if provided by the caller.

@@ -3,17 +3,17 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSyn
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { saveState } from "../../src/state.ts";
+import { saveState, COMMITTEE_SELECTION_RANGE } from "../../src/state.ts";
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const REGISTRY_APP_ID = 3147789458;
-const FIRST_SYNC_ROUND = 50_000_000;
 const FIXTURES = join(import.meta.dirname, "../fixtures");
 const RUNNER_ROOT = join(import.meta.dirname, "../..");
 
 describe("runner", () => {
   let fakeBinDir: string; // holds systemd-notify stub, added to PATH
   let stateDir: string;
+  let currentRound: number;
 
   beforeAll(async () => {
     fakeBinDir = mkdtempSync(join(tmpdir(), "fake-bin-"));
@@ -35,9 +35,13 @@ describe("runner", () => {
       clearTimeout(timer);
     }
     const { "last-round": lastRound } = (await resp.json()) as { "last-round": number };
-    // Seed 2 blocks behind tip so tests with no boundary crossed exit cleanly.
+    currentRound = lastRound;
+    // Set seed cache round close to and lower than chain tip:
+    // We want to test the "no boundary crossed" logic in a realistic scenario.
+    const lastBf = Math.floor(lastRound / 1e6) * 1e6;
     saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-      lastProcessedRound: lastRound - 2,
+      lastGovernancePeriod: { Bi: lastBf - COMMITTEE_SELECTION_RANGE, Bf: lastBf },
+      lastCacheRound: lastRound - 2,
       updatedAt: new Date().toISOString(),
     });
   });
@@ -68,8 +72,12 @@ describe("runner", () => {
   }
 
   function seedStaleState() {
+    // Two periods behind current tip — triggers catch-up to spawn the generator.
+    const lastBf = Math.floor(currentRound / 1e6) * 1e6;
+    const staleBf = lastBf - 2e6;
     saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-      lastProcessedRound: 0,
+      lastGovernancePeriod: { Bi: staleBf - COMMITTEE_SELECTION_RANGE, Bf: staleBf },
+      lastCacheRound: staleBf,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -108,7 +116,7 @@ describe("runner", () => {
     });
   }
 
-  it("bootstraps state from registry creation round when no state file exists", () => {
+  it("bootstraps state from registry creation round when no state file exists", { timeout: 60_000 }, () => {
     const freshDir = mkdtempSync(join(tmpdir(), "runner-bootstrap-"));
     try {
       const result = runRunner({
@@ -117,13 +125,45 @@ describe("runner", () => {
         COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-instant-exit.js"),
       });
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain(`bootstrapping from round ${FIRST_SYNC_ROUND}`);
+      expect(result.stdout).toContain("bootstrapping from first governance period");
       const stateFiles = readdirSync(freshDir).filter((f) => f.endsWith(".json"));
       expect(stateFiles).toHaveLength(1);
       const state = JSON.parse(readFileSync(join(freshDir, stateFiles[0]), "utf8"));
-      expect(state.lastProcessedRound).toBeGreaterThan(0);
+      expect(state.lastGovernancePeriod).toBeDefined();
+      expect(state.lastGovernancePeriod.Bi).toBeLessThan(state.lastGovernancePeriod.Bf);
     } finally {
       rmSync(freshDir, { recursive: true, force: true });
+    }
+  });
+
+  it("catches up across multiple periods from stale state", { timeout: 60_000 }, () => {
+    // Seed state far behind current round — runner should process multiple catch-up periods
+    const catchupDir = mkdtempSync(join(tmpdir(), "runner-catchup-"));
+    try {
+      const lastBf = Math.floor(currentRound / 1e6) * 1e6;
+      const staleBf = lastBf - 2e6;
+      saveState(catchupDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
+        lastGovernancePeriod: { Bi: staleBf - COMMITTEE_SELECTION_RANGE, Bf: staleBf },
+        lastCacheRound: staleBf,
+        updatedAt: new Date().toISOString(),
+      });
+      const result = runRunner({
+        ...baseEnv(),
+        STATE_DIR: catchupDir,
+        COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-instant-exit.js"),
+      });
+      expect(result.status).toBe(0);
+      // Should have processed multiple periods via catch-up
+      const matches = (result.stdout.match(/catch-up/g) || []).length;
+      expect(matches).toBeGreaterThanOrEqual(2);
+      // Final state should have advanced past the stale period
+      const stateFiles = readdirSync(catchupDir).filter((f) => f.endsWith(".json"));
+      const state = JSON.parse(readFileSync(join(catchupDir, stateFiles[0]), "utf8"));
+      expect(state.lastGovernancePeriod.Bf).toBeGreaterThan(staleBf);
+      // lastCacheRound should be at least as recent as the end of the final governance period
+      expect(state.lastCacheRound).toBeGreaterThanOrEqual(state.lastGovernancePeriod.Bf);
+    } finally {
+      rmSync(catchupDir, { recursive: true, force: true });
     }
   });
 
@@ -146,13 +186,19 @@ describe("runner", () => {
 
   it("exits with code 1 when generator fails with a fatal error", () => {
     seedStaleState();
+    const stateFiles = readdirSync(stateDir).filter((f) => f.endsWith(".json"));
+    const stateBefore = JSON.parse(readFileSync(join(stateDir, stateFiles[0]), "utf8"));
     const result = runRunner({
       ...baseEnv(),
       COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-fatal.js"),
     });
     expect(result.status).toBe(1);
+    expect(result.stderr).toBe("");
     expect(result.stdout).toContain("run() failed");
     expect(result.stdout).toContain("fatal error");
+    // State should not have been updated (generator failed before saveState)
+    const stateAfter = JSON.parse(readFileSync(join(stateDir, stateFiles[0]), "utf8"));
+    expect(stateAfter.lastCacheRound).toBe(stateBefore.lastCacheRound);
   });
 
   it("escalates to SIGKILL after grace period when generator ignores SIGTERM", { timeout: 50_000 }, async () => {

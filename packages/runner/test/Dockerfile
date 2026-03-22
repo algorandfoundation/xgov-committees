@@ -41,14 +41,10 @@ RUN printf 'SLACK_BOT_TOKEN=xoxb-test\nSLACK_CHANNEL_ID=C0TEST\n' > /opt/xgov-co
 RUN chown -R root:xgov-committees-runner /opt/xgov-committees \
  && chmod -R u=rwX,g=rX,o= /opt/xgov-committees
 
-# Seed the state directory so the runner finds existing state on first boot.
-# lastProcessedRound is intentionally 0 to guarantee a 100K boundary is crossed on the first run.
+# State directory (state is seeded at run time by seed-state.ts, not at build time,
+# because it must be close to the current chain tip).
 RUN mkdir -p /var/lib/xgov-committees-runner \
- && chown xgov-committees-runner /var/lib/xgov-committees-runner \
- && printf '{"lastProcessedRound":0,"updatedAt":"2024-01-01T00:00:00.000Z"}\n' \
-    > '/var/lib/xgov-committees-runner/wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_-3147789458.json' \
- && chown xgov-committees-runner \
-    '/var/lib/xgov-committees-runner/wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_-3147789458.json'
+ && chown xgov-committees-runner:xgov-committees-runner /var/lib/xgov-committees-runner
 
 RUN cp systemd/runner.service /etc/systemd/system/ \
  && cp systemd/runner.timer /etc/systemd/system/
