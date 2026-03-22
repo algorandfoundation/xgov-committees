@@ -210,7 +210,7 @@ export async function run(config: Config): Promise<void> {
 
     if (currentRound >= Bf) await handleCatchUp();
     else if (closeTo1MBoundary(currentRound)) await handleApproachingPeriodEnd();
-    else if (crossed100KBoundary(state.lastCacheRound, currentRound)) await handleBoundaryCrossed();
+    else if (crossed100KBoundary(state.lastCacheRound + 1, currentRound)) await handleBoundaryCrossed();
     else break;
   }
 }
