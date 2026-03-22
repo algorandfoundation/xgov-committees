@@ -118,7 +118,7 @@ case "$TEST_SCENARIO" in
   boot)
     seed_state
     exec_container systemctl start runner.timer
-    wait_for Result "success|failed" 30
+    sleep 5
     assert_result
     assert_log "Runner started successfully"
     echo "Boot test passed."
