@@ -3,11 +3,10 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, chmodSyn
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { saveState } from "../../src/state.ts";
+import { saveState, INITIAL_PERIOD, COMMITTEE_SELECTION_RANGE } from "../../src/state.ts";
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const REGISTRY_APP_ID = 3147789458;
-const FIRST_SYNC_ROUND = 50_000_000;
 const FIXTURES = join(import.meta.dirname, "../fixtures");
 const RUNNER_ROOT = join(import.meta.dirname, "../..");
 
@@ -36,8 +35,10 @@ describe("runner", () => {
     }
     const { "last-round": lastRound } = (await resp.json()) as { "last-round": number };
     // Seed 2 blocks behind tip so tests with no boundary crossed exit cleanly.
+    const lastBf = Math.floor(lastRound / 1e6) * 1e6;
     saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-      lastProcessedRound: lastRound - 2,
+      lastGovernancePeriod: { Bi: lastBf - COMMITTEE_SELECTION_RANGE, Bf: lastBf },
+      lastCacheRound: lastRound - 2,
       updatedAt: new Date().toISOString(),
     });
   });
@@ -69,7 +70,8 @@ describe("runner", () => {
 
   function seedStaleState() {
     saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-      lastProcessedRound: 0,
+      lastGovernancePeriod: { Bi: 49e6, Bf: 52e6 },
+      lastCacheRound: 0,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -117,13 +119,44 @@ describe("runner", () => {
         COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-instant-exit.js"),
       });
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain(`bootstrapping from round ${FIRST_SYNC_ROUND}`);
+      expect(result.stdout).toContain("bootstrapping from first governance period");
       const stateFiles = readdirSync(freshDir).filter((f) => f.endsWith(".json"));
       expect(stateFiles).toHaveLength(1);
       const state = JSON.parse(readFileSync(join(freshDir, stateFiles[0]), "utf8"));
-      expect(state.lastProcessedRound).toBeGreaterThan(0);
+      expect(state.lastGovernancePeriod).toBeDefined();
+      expect(state.lastGovernancePeriod.Bi).toBe(INITIAL_PERIOD.Bi);
+      expect(state.lastGovernancePeriod.Bi).toBeLessThan(state.lastGovernancePeriod.Bf);
     } finally {
       rmSync(freshDir, { recursive: true, force: true });
+    }
+  });
+
+  it("catches up across multiple periods from stale state", () => {
+    // Seed state far behind current round — runner should process multiple catch-up periods
+    const catchupDir = mkdtempSync(join(tmpdir(), "runner-catchup-"));
+    try {
+      saveState(catchupDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
+        lastGovernancePeriod: { Bi: 49e6, Bf: 52e6 },
+        lastCacheRound: 0,
+        updatedAt: new Date().toISOString(),
+      });
+      const result = runRunner({
+        ...baseEnv(),
+        STATE_DIR: catchupDir,
+        COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-instant-exit.js"),
+      });
+      expect(result.status).toBe(0);
+      // Should have processed multiple periods via catch-up
+      const matches = (result.stdout.match(/catch-up/g) || []).length;
+      expect(matches).toBeGreaterThanOrEqual(2);
+      // Final state should have advanced past the stale period
+      const stateFiles = readdirSync(catchupDir).filter((f) => f.endsWith(".json"));
+      const state = JSON.parse(readFileSync(join(catchupDir, stateFiles[0]), "utf8"));
+      expect(state.lastGovernancePeriod.Bf).toBeGreaterThan(52e6);
+      // lastCacheRound should be recent (warming ran after catch-up, not stuck at a stale Bf)
+      expect(state.lastCacheRound).toBeGreaterThan(state.lastGovernancePeriod.Bf);
+    } finally {
+      rmSync(catchupDir, { recursive: true, force: true });
     }
   });
 
@@ -151,8 +184,13 @@ describe("runner", () => {
       COMMITTEE_GENERATOR_PATH: join(FIXTURES, "generator-fatal.js"),
     });
     expect(result.status).toBe(1);
+    expect(result.stderr).toBe("");
     expect(result.stdout).toContain("run() failed");
     expect(result.stdout).toContain("fatal error");
+    // State should not have been updated (generator failed before saveState)
+    const stateFiles = readdirSync(stateDir).filter((f) => f.endsWith(".json"));
+    const state = JSON.parse(readFileSync(join(stateDir, stateFiles[0]), "utf8"));
+    expect(state.lastCacheRound).toBe(0);
   });
 
   it("escalates to SIGKILL after grace period when generator ignores SIGTERM", { timeout: 50_000 }, async () => {
