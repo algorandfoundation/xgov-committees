@@ -12,6 +12,7 @@ export function validateCommitteeString(committeeStr: string): Committee {
   try {
     committee = JSON.parse(committeeStr);
   } catch (e) {
+    // eslint-disable-next-line preserve-caught-error
     throw new Error(`Committee JSON was invalid: ${(e as Error).message}`);
   }
 
@@ -42,7 +43,7 @@ export function validateCommitteeString(committeeStr: string): Committee {
   for (const { address, votes } of committee.xGovs) {
     try {
       decodeAddress(address);
-    } catch (e) {
+    } catch {
       throw new Error(`Committee JSON included invalid address: ${address}`);
     }
     if (xGovs.has(address)) {
