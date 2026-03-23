@@ -104,7 +104,7 @@ describe('ensureCommitteeShortcuts', () => {
     const { getCommitteeID } = await import('../../src/committee');
     const { committeeIdToSafeFileName } = await import('../../src/utils');
     const committeeID = getCommitteeID(committeeData);
-    const safeCommitteeID = committeeIdToSafeFileName(Buffer.from(committeeID, 'base64'));
+    const safeCommitteeID = committeeIdToSafeFileName(committeeID);
     const committeeIDKey = getExpectedKey(`committee/${safeCommitteeID}.json`);
 
     // Upload all three files (original + both shortcuts)

@@ -62,9 +62,9 @@ export function sha512_256_raw(input: string | Buffer) {
   return Buffer.from(sha512_256(input), 'hex');
 }
 
-export function committeeIdToSafeFileName(committeeId: Buffer): string {
-  // Use base64url encoding (base64 without padding, using URL-safe characters)
-  return committeeId.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+export function committeeIdToSafeFileName(committeeIdBase64: string): string {
+  // Convert base64 to base64url (URL-safe characters and no padding)
+  return committeeIdBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 export async function walkDir(dir: string): Promise<string[]> {

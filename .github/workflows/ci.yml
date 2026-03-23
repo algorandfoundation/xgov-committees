@@ -26,9 +26,9 @@ jobs:
 
       - run: pnpm run format:check
 
-      - run: pnpm --filter xgov-committees-runner run lint # TODO: Replace with `pnpm run lint`
+      - run: pnpm run lint
 
-      - run: pnpm --filter xgov-committees-runner run build # TODO: Replace with `pnpm run build`
+      - run: pnpm run build
 
   test-generator:
     needs: style

@@ -67,35 +67,32 @@ export class CacheManager {
     if (this.loading.has(pageStart)) {
       return this.loading.get(pageStart)!;
     }
-    let q: Promise<CachePage>;
-    this.loading.set(
-      pageStart,
-      (q = new Promise(async (resolve, reject) => {
-        try {
-          if (config.verbose)
-            console.debug(`\nLoading ${pageStart} numPages:${this.numPages} max:${this.maxPages}`);
-          if (this.numPages > this.maxPages) {
-            await this.evictPage();
-          }
-
-          const filename = this.getBlockCacheFilePath(pageStart);
-          let page: CachePage;
-
-          if (this.useS3) {
-            page = await CachePage.loadPageFromS3(pageStart, filename);
-          } else {
-            page = await CachePage.loadPage(filename);
-          }
-
-          this.pages.set(pageStart, page);
-          this.loading.delete(pageStart);
-          resolve(page);
-        } catch (e) {
-          reject(e);
+    const loadPromise = Promise.resolve().then(async () => {
+      try {
+        if (config.verbose)
+          console.debug(`\nLoading ${pageStart} numPages:${this.numPages} max:${this.maxPages}`);
+        if (this.numPages > this.maxPages) {
+          await this.evictPage();
         }
-      })),
-    );
-    return q;
+
+        const filename = this.getBlockCacheFilePath(pageStart);
+        let page: CachePage;
+
+        if (this.useS3) {
+          page = await CachePage.loadPageFromS3(pageStart, filename);
+        } else {
+          page = await CachePage.loadPage(filename);
+        }
+
+        this.pages.set(pageStart, page);
+        return page;
+      } finally {
+        this.loading.delete(pageStart);
+      }
+    });
+
+    this.loading.set(pageStart, loadPromise);
+    return loadPromise;
   }
 
   get oldestPage() {

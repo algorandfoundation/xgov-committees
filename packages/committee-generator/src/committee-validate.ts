@@ -11,8 +11,9 @@ export function validateCommitteeString(committeeStr: string): Committee {
   let committee: Committee;
   try {
     committee = JSON.parse(committeeStr);
-  } catch (e) {
-    throw new Error(`Committee JSON was invalid: ${(e as Error).message}`);
+  } catch (e: unknown) {
+    const originalMessage = e instanceof Error ? e.message : String(e);
+    throw new Error(`Committee JSON was invalid: ${originalMessage}`, { cause: e });
   }
 
   const validate = new Ajv().compile(committeeSchema);
@@ -42,7 +43,7 @@ export function validateCommitteeString(committeeStr: string): Committee {
   for (const { address, votes } of committee.xGovs) {
     try {
       decodeAddress(address);
-    } catch (e) {
+    } catch {
       throw new Error(`Committee JSON included invalid address: ${address}`);
     }
     if (xGovs.has(address)) {

@@ -63,10 +63,14 @@ beforeAll(async () => {
     const s3Client = getOrCreateS3Client();
     await s3Client.send(new CreateBucketCommand({ Bucket: TEST_BUCKET_NAME }));
     console.log('[setupFiles beforeAll] Bucket created/verified');
-  } catch (error: any) {
-    // Bucket already exists is OK, but other errors should fail immediately
-    if (error.name !== 'BucketAlreadyExists' && error.name !== 'BucketAlreadyOwnedByYou') {
-      throw error;
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      // Bucket already exists is OK, but other errors should fail immediately
+      if (error.name !== 'BucketAlreadyExists' && error.name !== 'BucketAlreadyOwnedByYou') {
+        throw error;
+      }
+    } else {
+      throw new Error('Unexpected error during bucket creation', { cause: error });
     }
   }
 });

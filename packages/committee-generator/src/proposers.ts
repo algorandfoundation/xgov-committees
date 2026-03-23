@@ -27,7 +27,7 @@ const _getBlockProposers = async (rnds: number[]): Promise<ProposerMap> => {
     await pMap(
       chunked,
       async (rnd) => {
-        const { proposer: proposerAddr, round, genesisHash } = await getBlock(rnd);
+        const { proposer: proposerAddr } = await getBlock(rnd);
         const proposer = proposerAddr.toString();
 
         const existingRounds = proposers.get(proposer) ?? [];

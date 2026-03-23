@@ -194,8 +194,7 @@ const parsedArgs = parser.help().parseSync();
 for (const argvConfigEntry of argvConfig) {
   const { name, type } = argvConfigEntry;
   if (type !== 'number') continue;
-  // @ts-ignore - kebab-case property access
-  const value = parsedArgs[name];
+  const value = (parsedArgs as Record<string, unknown>)[name];
   if (isNaN(value as number)) {
     console.error(`Configuration value "${name}" expected a number, found non-numeric value`);
     process.exit(1);

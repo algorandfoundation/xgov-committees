@@ -6,6 +6,7 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import { networkMetadata } from '../algod';
 import { config } from '../config';
@@ -30,7 +31,7 @@ export function getS3Client(): S3Client {
   }
 
   if (!s3Client) {
-    const clientConfig: any = {
+    const clientConfig: S3ClientConfig = {
       region: region,
       endpoint: endpoint,
       credentials: {
@@ -512,7 +513,7 @@ export async function uploadData(
 export function getKeyWithNetworkMetadata(keySuffix: string): string {
   const { genesisID, genesisHash } = networkMetadata;
 
-  const networkPrefix = `${genesisID}-${genesisHash.replace(/[\/=]/g, '_')}`;
+  const networkPrefix = `${genesisID}-${genesisHash.replace(/[/=]/g, '_')}`;
 
   return `${networkPrefix}/${keySuffix}`;
 }
