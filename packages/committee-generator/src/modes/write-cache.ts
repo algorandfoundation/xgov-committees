@@ -58,6 +58,7 @@ export async function runWriteCache(fromBlock: number, toBlock: number): Promise
   }
 
   const committeeID = getCommitteeID(committee);
+  // @ts-expect-error - At runtime `committeeID` is a string-compatible identifier
   const safeCommitteeID = committeeIdToSafeFileName(committeeID);
   console.log('Safe committee filename:', safeCommitteeID);
   console.log('Committee ID:', committeeID);

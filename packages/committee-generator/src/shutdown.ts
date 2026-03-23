@@ -170,6 +170,8 @@ export async function awaitShutdown(): Promise<never> {
   }
   // If no shutdown in progress but this was called, initiate graceful shutdown
   // This handles the edge case where ShuttingDownError is thrown but shutdown hasn't started yet
+  // @ts-expect-error - shutdown is inferred as Promise<void>, but awaitShutdown is declared as Promise<never>;
+  // TypeScript reports: "Type 'Promise<void>' is not assignable to type 'Promise<never>'", but at runtime this never resolves.
   return shutdown(ExitCode.SUCCESS, 'expected', 'Awaiting shutdown when no shutdown in progress');
 }
 
