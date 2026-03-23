@@ -219,7 +219,6 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
       }
 
       const committeeID = getCommitteeID(committee);
-      // @ts-expect-error - At runtime `committeeID` is a string-compatible identifier
       const safeCommitteeID = committeeIdToSafeFileName(committeeID);
 
       const endRoundKey = `${baseKey}${toRound}.json`;
