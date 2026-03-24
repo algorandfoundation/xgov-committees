@@ -12,10 +12,10 @@
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "clean": "rm -rf packages/*/dist",
-    "lint": "pnpm -r run lint --if-present",
-    "lint:fix": "pnpm -r run lint:fix --if-present",
-    "format": "pnpm -r run format --if-present",
-    "format:check": "pnpm -r run format:check --if-present"
+    "lint": "pnpm -r --if-present run lint",
+    "lint:fix": "pnpm -r --if-present run lint:fix",
+    "format": "pnpm -r --if-present run format",
+    "format:check": "pnpm -r --if-present run format:check"
   },
   "devDependencies": {
     "husky": "^9.1.7",

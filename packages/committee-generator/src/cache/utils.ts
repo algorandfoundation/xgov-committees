@@ -6,7 +6,7 @@ export const getCachePath = (subPath: string): string => {
   const { genesisID, genesisHash } = networkMetadata;
   const networkPath = join(
     config.dataPath,
-    `${genesisID}-${genesisHash.replace(/[\/=]/g, '_')}`,
+    `${genesisID}-${genesisHash.replace(/[/=]/g, '_')}`,
     subPath,
   );
   return networkPath;

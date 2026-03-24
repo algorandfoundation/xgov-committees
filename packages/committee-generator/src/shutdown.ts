@@ -117,7 +117,11 @@ async function waitForPendingOperations(timeoutMs = 30000): Promise<void> {
   }
 }
 
-export async function shutdown(exitCode: number, reason: ShutdownReason, message?: string) {
+export async function shutdown(
+  exitCode: number,
+  reason: ShutdownReason,
+  message?: string,
+): Promise<never> {
   if (shutdownPromise) {
     return shutdownPromise;
   }
@@ -125,7 +129,7 @@ export async function shutdown(exitCode: number, reason: ShutdownReason, message
   if (!shuttingDown) {
     shuttingDown = true;
 
-    shutdownPromise = (async () => {
+    shutdownPromise = (async (): Promise<never> => {
       console.log(`Shutdown initiated (${reason})`, message ?? '');
 
       try {
@@ -147,6 +151,11 @@ export async function shutdown(exitCode: number, reason: ShutdownReason, message
       // This will terminate the process; the Promise will never resolve.
       process.exit(exitCode);
     })();
+  }
+
+  if (!shutdownPromise) {
+    // This should be unreachable; added to satisfy the type system without using a non-null assertion.
+    throw new Error('Shutdown promise was not initialized');
   }
 
   return shutdownPromise;

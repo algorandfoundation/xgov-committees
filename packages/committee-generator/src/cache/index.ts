@@ -28,7 +28,7 @@ export const getCachedRounds = async (min: number, max: number): Promise<Set<num
           const data = JSON.parse(buffer.toString());
           const existingRounds = new Set(Object.keys(data).map((s) => parseInt(s, 10)));
           rounds.push(...existingRounds);
-        } catch (e) {
+        } catch {
           // pretend corrupt files do not exist, they will be overwritten anyway
         }
       }),
