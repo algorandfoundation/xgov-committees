@@ -15,7 +15,9 @@ const ALGOD_SERVER = process.env.ALGOD_SERVER ?? "https://mainnet-api.4160.nodel
 const ALGOD_PORT = process.env.ALGOD_PORT ?? "443";
 const catchUp = process.argv.includes("--catch-up");
 
-const resp = await fetch(`${ALGOD_SERVER}:${ALGOD_PORT}/v2/transactions/params`);
+const url = `${ALGOD_SERVER}:${ALGOD_PORT}/v2/transactions/params`;
+const resp = await fetch(url);
+if (!resp.ok) throw new Error(`seed-state: ${resp.status} ${resp.statusText} from ${url}`);
 const { "last-round": lastRound } = (await resp.json()) as { "last-round": number };
 const lastBf = Math.floor(lastRound / 1e6) * 1e6;
 
