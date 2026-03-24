@@ -117,7 +117,11 @@ async function waitForPendingOperations(timeoutMs = 30000): Promise<void> {
   }
 }
 
-export async function shutdown(exitCode: number, reason: ShutdownReason, message?: string) {
+export async function shutdown(
+  exitCode: number,
+  reason: ShutdownReason,
+  message?: string,
+): Promise<never> {
   if (shutdownPromise) {
     return shutdownPromise;
   }
@@ -125,7 +129,7 @@ export async function shutdown(exitCode: number, reason: ShutdownReason, message
   if (!shuttingDown) {
     shuttingDown = true;
 
-    shutdownPromise = (async () => {
+    shutdownPromise = (async (): Promise<never> => {
       console.log(`Shutdown initiated (${reason})`, message ?? '');
 
       try {
@@ -149,6 +153,11 @@ export async function shutdown(exitCode: number, reason: ShutdownReason, message
     })();
   }
 
+  if (!shutdownPromise) {
+    // This should be unreachable; added to satisfy the type system without using a non-null assertion.
+    throw new Error('Shutdown promise was not initialized');
+  }
+
   return shutdownPromise;
 }
 
@@ -170,8 +179,6 @@ export async function awaitShutdown(): Promise<never> {
   }
   // If no shutdown in progress but this was called, initiate graceful shutdown
   // This handles the edge case where ShuttingDownError is thrown but shutdown hasn't started yet
-  // @ts-expect-error - shutdown is inferred as Promise<void>, but awaitShutdown is declared as Promise<never>;
-  // TypeScript reports: "Type 'Promise<void>' is not assignable to type 'Promise<never>'", but at runtime this never resolves.
   return shutdown(ExitCode.SUCCESS, 'expected', 'Awaiting shutdown when no shutdown in progress');
 }
 
