@@ -293,9 +293,9 @@ describe("run", () => {
     };
   }
 
-  // All tests use lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 } as base state.
-  function makeState(lastCacheRound: number, Bi = 50e6, Bf = 53e6) {
-    return { lastGovernancePeriod: { Bi, Bf }, lastCacheRound, updatedAt: "" };
+  // All tests use lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 } as base state.
+  function makeState(lastCacheRound: number, startRound = 50e6, endRound = 53e6) {
+    return { lastGovernancePeriod: { startRound, endRound }, lastCacheRound, updatedAt: "" };
   }
 
   it("bootstraps from initial governance period when no state file exists", async () => {
@@ -339,7 +339,7 @@ describe("run", () => {
       stateDir,
       MAINNET_GENESIS_HASH,
       999,
-      expect.objectContaining({ lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 }, lastCacheRound: 53e6 }),
+      expect.objectContaining({ lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 }, lastCacheRound: 53e6 }),
     );
     expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining("bootstrapping"));
   });
@@ -510,7 +510,7 @@ describe("run", () => {
       stateDir,
       MAINNET_GENESIS_HASH,
       999,
-      expect.objectContaining({ lastGovernancePeriod: { Bi: 51e6, Bf: 54e6 }, lastCacheRound: 54e6 }),
+      expect.objectContaining({ lastGovernancePeriod: { startRound: 51e6, endRound: 54e6 }, lastCacheRound: 54e6 }),
     );
   });
 

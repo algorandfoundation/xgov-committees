@@ -2,24 +2,24 @@ import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * @property Bi - period start block (inclusive)
- * @property Bf - period end block (exclusive)
+ * @property startRound - period start block (inclusive); Bi in the xGov docs
+ * @property endRound - period end block (exclusive); Bf in the xGov docs
  *
- * Bi and Bf must be multiples of 1M and satisfy Bi < Bf.
- * The range `Bf - Bi` is the committee selection range, currently 3M blocks - {@link COMMITTEE_SELECTION_RANGE}
+ * startRound and endRound must be multiples of 1M and satisfy startRound < endRound.
+ * The range `endRound - startRound` is the committee selection range, currently 3M blocks - {@link COMMITTEE_SELECTION_RANGE}
  * The first ever governance period is [50M; 53M) - {@link INITIAL_PERIOD}
  * The cohort validity is currently 1M blocks. The cohort validity range is the offset between two consecutive governance periods - {@link COHORT_VALIDITY_RANGE}.
  */
 export interface GovernancePeriod {
-  Bi: number;
-  Bf: number;
+  startRound: number;
+  endRound: number;
 }
 
-export const COMMITTEE_SELECTION_RANGE = 3e6;
-export const COHORT_VALIDITY_RANGE = 1e6;
+export const COMMITTEE_SELECTION_RANGE = 3_000_000;
+export const COHORT_VALIDITY_RANGE = 1_000_000;
 export const INITIAL_PERIOD: GovernancePeriod = {
-  Bi: 50e6,
-  Bf: 50e6 + COMMITTEE_SELECTION_RANGE,
+  startRound: 50_000_000,
+  endRound: 50_000_000 + COMMITTEE_SELECTION_RANGE,
 };
 
 /**

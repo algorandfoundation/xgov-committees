@@ -115,12 +115,12 @@ function getState(config: Config, genesisHash: string): Omit<RunnerState, "updat
   if (state != null) return state;
   else {
     console.log(
-      `No state file found — bootstrapping from first governance period (${INITIAL_PERIOD.Bi}, ${INITIAL_PERIOD.Bf}) (\`write-cache\` mode is idempotent)`,
+      `No state file found — bootstrapping from first governance period (${INITIAL_PERIOD.startRound}, ${INITIAL_PERIOD.endRound}) (\`write-cache\` mode is idempotent)`,
     );
     return {
       lastGovernancePeriod: {
-        Bi: INITIAL_PERIOD.Bi - COHORT_VALIDITY_RANGE,
-        Bf: INITIAL_PERIOD.Bf - COHORT_VALIDITY_RANGE,
+        startRound: INITIAL_PERIOD.startRound - COHORT_VALIDITY_RANGE,
+        endRound: INITIAL_PERIOD.endRound - COHORT_VALIDITY_RANGE,
       },
       lastCacheRound: 0,
     };
@@ -132,8 +132,8 @@ function getState(config: Config, genesisHash: string): Omit<RunnerState, "updat
  */
 function nextGovernancePeriod(lastProcessed: GovernancePeriod): GovernancePeriod {
   return {
-    Bi: lastProcessed.Bi + COHORT_VALIDITY_RANGE,
-    Bf: lastProcessed.Bf + COHORT_VALIDITY_RANGE,
+    startRound: lastProcessed.startRound + COHORT_VALIDITY_RANGE,
+    endRound: lastProcessed.endRound + COHORT_VALIDITY_RANGE,
   };
 }
 
@@ -163,10 +163,10 @@ export async function run(config: Config): Promise<void> {
     const currentRound = Number(firstValid);
 
     const state = getState(config, genesisHash);
-    const { Bi, Bf } = nextGovernancePeriod(state.lastGovernancePeriod);
+    const { startRound, endRound } = nextGovernancePeriod(state.lastGovernancePeriod);
 
     if (loopCounter === 1) console.log(`genesis: ${genesisHash}; registry: ${config.registryAppId}`);
-    console.log(`[#${loopCounter}] - current round ${currentRound}; processing period: (${Bi}, ${Bf})`);
+    console.log(`[#${loopCounter}] - current round ${currentRound}; processing period: (${startRound}, ${endRound})`);
 
     if (currentRound <= state.lastCacheRound) {
       if (loopCounter === 1)
@@ -178,29 +178,31 @@ export async function run(config: Config): Promise<void> {
     }
 
     async function handlePeriodEnd() {
-      await runWriteCache(algorand, config.committeeGeneratorPath, Bi, Bf);
+      await runWriteCache(algorand, config.committeeGeneratorPath, startRound, endRound);
       saveState(config.stateDir, genesisHash, config.registryAppId, {
-        lastGovernancePeriod: { Bi, Bf },
-        lastCacheRound: Bf,
+        lastGovernancePeriod: { startRound, endRound },
+        lastCacheRound: endRound,
         updatedAt: new Date().toISOString(),
       });
     }
 
     async function handleCatchUp() {
-      console.log(`catch-up: all blocks available, calling write-cache with (${Bi}, ${Bf})`);
+      console.log(`catch-up: all blocks available, calling write-cache with (${startRound}, ${endRound})`);
       await handlePeriodEnd();
     }
 
     async function handleApproachingPeriodEnd() {
-      console.log(`approaching period end at ${Bf}, waiting...`);
-      await waitForBlock(algorand, Bf + TIP_BUFFER);
-      console.log(`period end reached: all blocks available, calling write-cache with (${Bi}, ${Bf})`);
+      console.log(`approaching period end at ${endRound}, waiting...`);
+      await waitForBlock(algorand, endRound + TIP_BUFFER);
+      console.log(`period end reached: all blocks available, calling write-cache with (${startRound}, ${endRound})`);
       await handlePeriodEnd();
     }
 
     async function handleBoundaryCrossed() {
-      console.log(`100K boundary crossed since last cache update, calling write-cache with (${Bi}, ${Bf})`);
-      await runWriteCache(algorand, config.committeeGeneratorPath, Bi, Bf, false);
+      console.log(
+        `100K boundary crossed since last cache update, calling write-cache with (${startRound}, ${endRound})`,
+      );
+      await runWriteCache(algorand, config.committeeGeneratorPath, startRound, endRound, false);
       saveState(config.stateDir, genesisHash, config.registryAppId, {
         ...state,
         lastCacheRound: currentRound,
@@ -208,7 +210,7 @@ export async function run(config: Config): Promise<void> {
       });
     }
 
-    if (currentRound >= Bf) await handleCatchUp();
+    if (currentRound >= endRound) await handleCatchUp();
     else if (closeTo1MBoundary(currentRound)) await handleApproachingPeriodEnd();
     else if (crossed100KBoundary(state.lastCacheRound + 1, currentRound)) await handleBoundaryCrossed();
     else break;

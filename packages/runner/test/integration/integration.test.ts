@@ -38,9 +38,9 @@ describe("runner", () => {
     currentRound = lastRound;
     // Set seed cache round close to and lower than chain tip:
     // We want to test the "no boundary crossed" logic in a realistic scenario.
-    const lastBf = Math.floor(lastRound / 1e6) * 1e6;
+    const lastPeriodEnd = Math.floor(lastRound / 1e6) * 1e6;
     saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-      lastGovernancePeriod: { Bi: lastBf - COMMITTEE_SELECTION_RANGE, Bf: lastBf },
+      lastGovernancePeriod: { startRound: lastPeriodEnd - COMMITTEE_SELECTION_RANGE, endRound: lastPeriodEnd },
       lastCacheRound: lastRound - 2,
       updatedAt: new Date().toISOString(),
     });
@@ -73,11 +73,11 @@ describe("runner", () => {
 
   function seedStaleState() {
     // Two periods behind current tip — triggers catch-up to spawn the generator.
-    const lastBf = Math.floor(currentRound / 1e6) * 1e6;
-    const staleBf = lastBf - 2e6;
+    const lastPeriodEnd = Math.floor(currentRound / 1e6) * 1e6;
+    const stalePeriodEnd = lastPeriodEnd - 2e6;
     saveState(stateDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-      lastGovernancePeriod: { Bi: staleBf - COMMITTEE_SELECTION_RANGE, Bf: staleBf },
-      lastCacheRound: staleBf,
+      lastGovernancePeriod: { startRound: stalePeriodEnd - COMMITTEE_SELECTION_RANGE, endRound: stalePeriodEnd },
+      lastCacheRound: stalePeriodEnd,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -130,7 +130,7 @@ describe("runner", () => {
       expect(stateFiles).toHaveLength(1);
       const state = JSON.parse(readFileSync(join(freshDir, stateFiles[0]), "utf8"));
       expect(state.lastGovernancePeriod).toBeDefined();
-      expect(state.lastGovernancePeriod.Bi).toBeLessThan(state.lastGovernancePeriod.Bf);
+      expect(state.lastGovernancePeriod.startRound).toBeLessThan(state.lastGovernancePeriod.endRound);
     } finally {
       rmSync(freshDir, { recursive: true, force: true });
     }
@@ -140,11 +140,11 @@ describe("runner", () => {
     // Seed state far behind current round — runner should process multiple catch-up periods
     const catchupDir = mkdtempSync(join(tmpdir(), "runner-catchup-"));
     try {
-      const lastBf = Math.floor(currentRound / 1e6) * 1e6;
-      const staleBf = lastBf - 2e6;
+      const lastPeriodEnd = Math.floor(currentRound / 1e6) * 1e6;
+      const stalePeriodEnd = lastPeriodEnd - 2e6;
       saveState(catchupDir, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-        lastGovernancePeriod: { Bi: staleBf - COMMITTEE_SELECTION_RANGE, Bf: staleBf },
-        lastCacheRound: staleBf,
+        lastGovernancePeriod: { startRound: stalePeriodEnd - COMMITTEE_SELECTION_RANGE, endRound: stalePeriodEnd },
+        lastCacheRound: stalePeriodEnd,
         updatedAt: new Date().toISOString(),
       });
       const result = runRunner({
@@ -159,9 +159,9 @@ describe("runner", () => {
       // Final state should have advanced past the stale period
       const stateFiles = readdirSync(catchupDir).filter((f) => f.endsWith(".json"));
       const state = JSON.parse(readFileSync(join(catchupDir, stateFiles[0]), "utf8"));
-      expect(state.lastGovernancePeriod.Bf).toBeGreaterThan(staleBf);
+      expect(state.lastGovernancePeriod.endRound).toBeGreaterThan(stalePeriodEnd);
       // lastCacheRound should be at least as recent as the end of the final governance period
-      expect(state.lastCacheRound).toBeGreaterThanOrEqual(state.lastGovernancePeriod.Bf);
+      expect(state.lastCacheRound).toBeGreaterThanOrEqual(state.lastGovernancePeriod.endRound);
     } finally {
       rmSync(catchupDir, { recursive: true, force: true });
     }

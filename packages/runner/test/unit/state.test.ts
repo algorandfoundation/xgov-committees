@@ -31,7 +31,7 @@ describe("state", () => {
 
     it("returns the saved state when a file exists", () => {
       const state: RunnerState = {
-        lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 },
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
         lastCacheRound: 53e6,
         updatedAt: "2026-01-01T00:00:00.000Z",
       };
@@ -43,7 +43,7 @@ describe("state", () => {
   describe("saveState", () => {
     it("writes the correct JSON", () => {
       const state: RunnerState = {
-        lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 },
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
         lastCacheRound: 53e6,
         updatedAt: "2026-01-01T00:00:00.000Z",
       };
@@ -53,12 +53,12 @@ describe("state", () => {
 
     it("overwrites an existing state file", () => {
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, {
-        lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 },
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
         lastCacheRound: 53e6,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, {
-        lastGovernancePeriod: { Bi: 51e6, Bf: 54e6 },
+        lastGovernancePeriod: { startRound: 51e6, endRound: 54e6 },
         lastCacheRound: 54e6,
         updatedAt: "2026-01-02T00:00:00.000Z",
       });
@@ -67,7 +67,7 @@ describe("state", () => {
 
     it("does not leave a .tmp file behind", () => {
       const state: RunnerState = {
-        lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 },
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
         lastCacheRound: 53e6,
         updatedAt: "2026-01-01T00:00:00.000Z",
       };
@@ -78,12 +78,12 @@ describe("state", () => {
 
     it("uses separate files for different registry app IDs", () => {
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, {
-        lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 },
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
         lastCacheRound: 100,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
       saveState(stateDir, GENESIS_HASH, 999, {
-        lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 },
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
         lastCacheRound: 200,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
@@ -94,12 +94,12 @@ describe("state", () => {
     it("uses separate files for different genesis hashes", () => {
       const otherGenesisHash = "SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=";
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, {
-        lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 },
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
         lastCacheRound: 100,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
       saveState(stateDir, otherGenesisHash, REGISTRY_APP_ID, {
-        lastGovernancePeriod: { Bi: 50e6, Bf: 53e6 },
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
         lastCacheRound: 200,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });

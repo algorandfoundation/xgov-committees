@@ -19,23 +19,25 @@ const url = `${ALGOD_SERVER}:${ALGOD_PORT}/v2/transactions/params`;
 const resp = await fetch(url);
 if (!resp.ok) throw new Error(`seed-state: ${resp.status} ${resp.statusText} from ${url}`);
 const { "last-round": lastRound } = (await resp.json()) as { "last-round": number };
-const lastBf = Math.floor(lastRound / 1e6) * 1e6;
+const lastPeriodEnd = Math.floor(lastRound / 1e6) * 1e6;
 
 if (catchUp) {
   // Two periods behind the current chain tip - enough to trigger catch-up and spawn the generator.
-  const Bf = lastBf - 2e6;
-  const Bi = Bf - COMMITTEE_SELECTION_RANGE;
+  const endRound = lastPeriodEnd - 2e6;
+  const startRound = endRound - COMMITTEE_SELECTION_RANGE;
   saveState(STATE_DIR, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-    lastGovernancePeriod: { Bi, Bf },
-    lastCacheRound: Bf,
+    lastGovernancePeriod: { startRound, endRound },
+    lastCacheRound: endRound,
     updatedAt: new Date().toISOString(),
   });
-  console.log(`Seeded catch-up state: (${Bi}, ${Bf}), lastCacheRound=${Bf}`);
+  console.log(`Seeded catch-up state: (${startRound}, ${endRound}), lastCacheRound=${endRound}`);
 } else {
   saveState(STATE_DIR, MAINNET_GENESIS_HASH, REGISTRY_APP_ID, {
-    lastGovernancePeriod: { Bi: lastBf - COMMITTEE_SELECTION_RANGE, Bf: lastBf },
+    lastGovernancePeriod: { startRound: lastPeriodEnd - COMMITTEE_SELECTION_RANGE, endRound: lastPeriodEnd },
     lastCacheRound: lastRound - 2,
     updatedAt: new Date().toISOString(),
   });
-  console.log(`Seeded state: (${lastBf - COMMITTEE_SELECTION_RANGE}, ${lastBf}), lastCacheRound=${lastRound - 2}`);
+  console.log(
+    `Seeded state: (${lastPeriodEnd - COMMITTEE_SELECTION_RANGE}, ${lastPeriodEnd}), lastCacheRound=${lastRound - 2}`,
+  );
 }
