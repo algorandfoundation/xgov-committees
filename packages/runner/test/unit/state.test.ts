@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadState, saveState } from "../../src/state.ts";
+import { type RunnerState, loadState, saveState } from "../../src/state.ts";
 
 const GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
 const REGISTRY_APP_ID = 3147789458;
@@ -30,7 +30,11 @@ describe("state", () => {
     });
 
     it("returns the saved state when a file exists", () => {
-      const state = { lastProcessedRound: 58000000, updatedAt: "2026-01-01T00:00:00.000Z" };
+      const state: RunnerState = {
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
+        lastCacheRound: 53e6,
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, state);
       expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)).toEqual(state);
     });
@@ -38,25 +42,35 @@ describe("state", () => {
 
   describe("saveState", () => {
     it("writes the correct JSON", () => {
-      const state = { lastProcessedRound: 58000000, updatedAt: "2026-01-01T00:00:00.000Z" };
+      const state: RunnerState = {
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
+        lastCacheRound: 53e6,
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, state);
       expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)).toEqual(state);
     });
 
     it("overwrites an existing state file", () => {
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, {
-        lastProcessedRound: 58000000,
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
+        lastCacheRound: 53e6,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, {
-        lastProcessedRound: 58100000,
+        lastGovernancePeriod: { startRound: 51e6, endRound: 54e6 },
+        lastCacheRound: 54e6,
         updatedAt: "2026-01-02T00:00:00.000Z",
       });
-      expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)?.lastProcessedRound).toBe(58100000);
+      expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)?.lastCacheRound).toBe(54e6);
     });
 
     it("does not leave a .tmp file behind", () => {
-      const state = { lastProcessedRound: 58000000, updatedAt: "2026-01-01T00:00:00.000Z" };
+      const state: RunnerState = {
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
+        lastCacheRound: 53e6,
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, state);
       const safeHash = GENESIS_HASH.replace(/[/=]/g, "_");
       expect(existsSync(join(stateDir, `${safeHash}-${REGISTRY_APP_ID}.json.tmp`))).toBe(false);
@@ -64,29 +78,33 @@ describe("state", () => {
 
     it("uses separate files for different registry app IDs", () => {
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, {
-        lastProcessedRound: 100,
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
+        lastCacheRound: 100,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
       saveState(stateDir, GENESIS_HASH, 999, {
-        lastProcessedRound: 200,
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
+        lastCacheRound: 200,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
-      expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)?.lastProcessedRound).toBe(100);
-      expect(loadState(stateDir, GENESIS_HASH, 999)?.lastProcessedRound).toBe(200);
+      expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)?.lastCacheRound).toBe(100);
+      expect(loadState(stateDir, GENESIS_HASH, 999)?.lastCacheRound).toBe(200);
     });
 
     it("uses separate files for different genesis hashes", () => {
       const otherGenesisHash = "SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=";
       saveState(stateDir, GENESIS_HASH, REGISTRY_APP_ID, {
-        lastProcessedRound: 100,
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
+        lastCacheRound: 100,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
       saveState(stateDir, otherGenesisHash, REGISTRY_APP_ID, {
-        lastProcessedRound: 200,
+        lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 },
+        lastCacheRound: 200,
         updatedAt: "2026-01-01T00:00:00.000Z",
       });
-      expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)?.lastProcessedRound).toBe(100);
-      expect(loadState(stateDir, otherGenesisHash, REGISTRY_APP_ID)?.lastProcessedRound).toBe(200);
+      expect(loadState(stateDir, GENESIS_HASH, REGISTRY_APP_ID)?.lastCacheRound).toBe(100);
+      expect(loadState(stateDir, otherGenesisHash, REGISTRY_APP_ID)?.lastCacheRound).toBe(200);
     });
   });
 });
