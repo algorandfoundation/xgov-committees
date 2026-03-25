@@ -1,16 +1,20 @@
-import { getBlocks } from '../blocks';
-import { cacheManager } from '../cache/cache-manager';
+import { getBlocks } from '../blocks.ts';
+import { cacheManager } from '../cache/cache-manager.ts';
 import {
   loadCandidateCommittee,
   getCandidateCommittee,
   saveCandidateCommittee,
-} from '../candidate-committee';
-import { loadCommittee, getCommittee, saveCommittee, getCommitteeID } from '../committee';
-import { config } from '../config';
-import { loadProposers, getBlockProposers, saveProposers } from '../proposers';
-import { ensureCommitteeShortcuts } from '../s3';
-import { loadSubscribedXgovs, getSubscribedXgovs, saveSubscribedXgovs } from '../subscribed-xgovs';
-import { makeRndsArray, committeeIdToSafeFileName } from '../utils';
+} from '../candidate-committee.ts';
+import { loadCommittee, getCommittee, saveCommittee, getCommitteeID } from '../committee.ts';
+import { config } from '../config.ts';
+import { loadProposers, getBlockProposers, saveProposers } from '../proposers.ts';
+import { ensureCommitteeShortcuts } from '../s3/index.ts';
+import {
+  loadSubscribedXgovs,
+  getSubscribedXgovs,
+  saveSubscribedXgovs,
+} from '../subscribed-xgovs.ts';
+import { makeRndsArray, committeeIdToSafeFileName } from '../utils.ts';
 
 const { registryAppId } = config;
 

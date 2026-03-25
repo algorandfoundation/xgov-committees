@@ -17,7 +17,7 @@ WORKDIR /opt/xgov-committees
 RUN corepack enable
 
 # Install runner dependencies using the workspace root lock file.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY packages/runner/package.json packages/runner/
 RUN pnpm install --frozen-lockfile --filter xgov-committees-runner
 

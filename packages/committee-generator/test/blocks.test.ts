@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { TipReachedError, isGenuineTipReached } from '../src/blocks';
-import { createTipReachedMock } from './test-helpers';
+import { TipReachedError, isGenuineTipReached } from '../src/blocks.ts';
+import { createTipReachedMock } from './test-helpers.ts';
 
 // Mock modules before importing the functions under test
-vi.mock('../src/config', () => ({
+vi.mock('../src/config.ts', () => ({
   config: {
     concurrency: 5,
     algodServer: 'http://localhost',
@@ -12,19 +12,19 @@ vi.mock('../src/config', () => ({
   },
 }));
 
-vi.mock('../src/cache', () => ({
+vi.mock('../src/cache/index.ts', () => ({
   getCache: vi.fn(),
   setCache: vi.fn(),
   subtractCached: vi.fn(),
 }));
 
-vi.mock('../src/shutdown', () => ({
+vi.mock('../src/shutdown.ts', () => ({
   guardWhileNotShuttingDown: <T extends (...args: never[]) => unknown>(fn: T) => fn, // passthrough, no shutdown guard for tests
   isShuttingDown: vi.fn(() => false),
   fatalError: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../src/algod', () => ({
+vi.mock('../src/algod.ts', () => ({
   networkMetadata: {
     genesisID: 'mainnet-v1.0',
     genesisHash: 'wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=',
@@ -35,7 +35,7 @@ vi.mock('../src/algod', () => ({
   },
 }));
 
-vi.mock('../src/utils', () => ({
+vi.mock('../src/utils.ts', () => ({
   chunk: <T>(arr: T[], size: number) => {
     const chunks = [];
     for (let i = 0; i < arr.length; i += size) {
@@ -55,9 +55,9 @@ describe('blocks.ts - TipReachedError', () => {
 
   describe('getBlock', () => {
     it('should throw TipReachedError with correct block number when algod returns 404', async () => {
-      const { getCache } = await import('../src/cache');
-      const { algod } = await import('../src/algod');
-      const { getBlock } = await import('../src/blocks');
+      const { getCache } = await import('../src/cache/index.ts');
+      const { algod } = await import('../src/algod.ts');
+      const { getBlock } = await import('../src/blocks.ts');
 
       vi.mocked(getCache).mockResolvedValue(undefined);
       vi.mocked(algod.block).mockImplementation(createTipReachedMock());
@@ -72,9 +72,9 @@ describe('blocks.ts - TipReachedError', () => {
     });
 
     it('should rethrow non-404 errors', async () => {
-      const { getCache } = await import('../src/cache');
-      const { algod } = await import('../src/algod');
-      const { getBlock } = await import('../src/blocks');
+      const { getCache } = await import('../src/cache/index.ts');
+      const { algod } = await import('../src/algod.ts');
+      const { getBlock } = await import('../src/blocks.ts');
 
       vi.mocked(getCache).mockResolvedValue(undefined);
       vi.mocked(algod.block).mockReturnValue({
@@ -87,9 +87,9 @@ describe('blocks.ts - TipReachedError', () => {
     });
 
     it('should successfully return block when available from algod', async () => {
-      const { getCache, setCache } = await import('../src/cache');
-      const { algod, networkMetadata } = await import('../src/algod');
-      const { getBlock } = await import('../src/blocks');
+      const { getCache, setCache } = await import('../src/cache/index.ts');
+      const { algod, networkMetadata } = await import('../src/algod.ts');
+      const { getBlock } = await import('../src/blocks.ts');
 
       // Mock cache miss
       vi.mocked(getCache).mockResolvedValue(undefined);
@@ -121,9 +121,9 @@ describe('blocks.ts - TipReachedError', () => {
 
   describe('getBlocks', () => {
     it('should propagate TipReachedError when fetching multiple blocks', async () => {
-      const { getCache, subtractCached } = await import('../src/cache');
-      const { algod } = await import('../src/algod');
-      const { getBlocks } = await import('../src/blocks');
+      const { getCache, subtractCached } = await import('../src/cache/index.ts');
+      const { algod } = await import('../src/algod.ts');
+      const { getBlocks } = await import('../src/blocks.ts');
 
       // Mock cache to indicate no cached blocks
       vi.mocked(subtractCached).mockResolvedValue([99999990, 99999991, 99999992]);

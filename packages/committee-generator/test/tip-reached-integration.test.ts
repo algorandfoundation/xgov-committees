@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createTipReachedMock } from './test-helpers';
+import { createTipReachedMock } from './test-helpers.ts';
 
 // Mock all dependencies before importing modules
-vi.mock('../src/config', () => ({
+vi.mock('../src/config.ts', () => ({
   config: {
     cacheMode: 'write-cache' as const,
     registryAppId: 123456,
@@ -17,21 +17,21 @@ vi.mock('../src/config', () => ({
   },
 }));
 
-vi.mock('../src/cache', () => ({
+vi.mock('../src/cache/index.ts', () => ({
   getCache: vi.fn(),
   setCache: vi.fn(),
   subtractCached: vi.fn(),
   ensureCacheSubPathExists: vi.fn(),
 }));
 
-vi.mock('../src/cache/cache-manager', () => ({
+vi.mock('../src/cache/cache-manager.ts', () => ({
   cacheManager: {
     flushAllPages: vi.fn().mockResolvedValue(undefined),
   },
   shutdownCache: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../src/shutdown', () => ({
+vi.mock('../src/shutdown.ts', () => ({
   guardWhileNotShuttingDown: <T extends (...args: never[]) => unknown>(fn: T) => fn, // passthrough for tests
   isShuttingDown: vi.fn(() => false),
   ExitCode: {
@@ -47,7 +47,7 @@ vi.mock('../src/shutdown', () => ({
   awaitShutdown: vi.fn(),
 }));
 
-vi.mock('../src/algod', () => ({
+vi.mock('../src/algod.ts', () => ({
   networkMetadata: {
     genesisID: 'mainnet-v1.0',
     genesisHash: 'wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=',
@@ -58,7 +58,7 @@ vi.mock('../src/algod', () => ({
   },
 }));
 
-vi.mock('../src/utils', () => ({
+vi.mock('../src/utils.ts', () => ({
   chunk: <T>(arr: T[], size: number) => {
     const chunks = [];
     for (let i = 0; i < arr.length; i += size) {
@@ -79,32 +79,32 @@ vi.mock('../src/utils', () => ({
   committeeIdToSafeFileName: vi.fn((id: string) => id),
 }));
 
-vi.mock('../src/proposers', () => ({
+vi.mock('../src/proposers.ts', () => ({
   loadProposers: vi.fn().mockResolvedValue(null),
   getBlockProposers: vi.fn(),
   saveProposers: vi.fn(),
 }));
 
-vi.mock('../src/candidate-committee', () => ({
+vi.mock('../src/candidate-committee.ts', () => ({
   loadCandidateCommittee: vi.fn().mockResolvedValue(null),
   getCandidateCommittee: vi.fn(),
   saveCandidateCommittee: vi.fn(),
 }));
 
-vi.mock('../src/committee', () => ({
+vi.mock('../src/committee.ts', () => ({
   loadCommittee: vi.fn().mockResolvedValue(null),
   getCommittee: vi.fn(),
   saveCommittee: vi.fn(),
   getCommitteeID: vi.fn().mockReturnValue('test-committee-id'),
 }));
 
-vi.mock('../src/subscribed-xgovs', () => ({
+vi.mock('../src/subscribed-xgovs.ts', () => ({
   loadSubscribedXgovs: vi.fn().mockResolvedValue(null),
   getSubscribedXgovs: vi.fn(),
   saveSubscribedXgovs: vi.fn(),
 }));
 
-vi.mock('../src/s3', () => ({
+vi.mock('../src/s3/index.ts', () => ({
   ensureCommitteeShortcuts: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -114,9 +114,9 @@ describe('TipReachedError Integration Test', () => {
   });
 
   it('should propagate TipReachedError from getBlock through runWriteCache', async () => {
-    const { getCache, subtractCached } = await import('../src/cache');
-    const { algod } = await import('../src/algod');
-    const { runWriteCache } = await import('../src/modes/write-cache');
+    const { getCache, subtractCached } = await import('../src/cache/index.ts');
+    const { algod } = await import('../src/algod.ts');
+    const { runWriteCache } = await import('../src/modes/write-cache.ts');
 
     vi.mocked(subtractCached).mockResolvedValue([99999990, 99999991, 99999992]);
     vi.mocked(getCache).mockResolvedValue(undefined);

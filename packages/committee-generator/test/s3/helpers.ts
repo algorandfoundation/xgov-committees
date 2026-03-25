@@ -1,11 +1,11 @@
-import type { Committee } from '../../src/committee';
+import type { Committee } from '../../src/committee.ts';
 import {
   DeleteObjectsCommand,
   ListObjectsV2Command,
   type ListObjectsV2CommandOutput,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import { TEST_BUCKET_NAME, TEST_NETWORK_METADATA } from '../setup-files';
+import { TEST_BUCKET_NAME, TEST_NETWORK_METADATA } from '../setup-files.ts';
 
 export function createCommitteeFixture(
   fromRound: number,

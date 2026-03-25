@@ -1,13 +1,13 @@
 import { join } from 'path';
-import { ensureCacheSubPathExists } from './cache';
-import { getCachePath } from './cache/utils';
+import { ensureCacheSubPathExists } from './cache/index.ts';
+import { getCachePath } from './cache/utils.ts';
 import { readFile, writeFile } from 'fs/promises';
-import { networkMetadata } from './algod';
-import { CandidateCommittee } from './candidate-committee';
-import { clearLine, fsExists, sha512_256_raw } from './utils';
-import { validateCommitteeString } from './committee-validate';
-import { XGovsRecord } from './subscribed-xgovs';
-import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
+import { networkMetadata } from './algod.ts';
+import { type CandidateCommittee } from './candidate-committee.ts';
+import { clearLine, fsExists, sha512_256_raw } from './utils.ts';
+import { validateCommitteeString } from './committee-validate.ts';
+import { type XGovsRecord } from './subscribed-xgovs.ts';
+import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3/index.ts';
 
 export type Committee = {
   networkGenesisHash: string;

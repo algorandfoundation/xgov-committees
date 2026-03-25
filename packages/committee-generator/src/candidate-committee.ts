@@ -1,10 +1,10 @@
 import { join } from 'path';
-import { ensureCacheSubPathExists } from './cache';
-import { getCachePath } from './cache/utils';
+import { ensureCacheSubPathExists } from './cache/index.ts';
+import { getCachePath } from './cache/utils.ts';
 import { readFile, writeFile } from 'fs/promises';
-import { ProposerMap } from './proposers';
-import { clearLine, fsExists } from './utils';
-import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
+import { type ProposerMap } from './proposers.ts';
+import { clearLine, fsExists } from './utils.ts';
+import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3/index.ts';
 
 export type CandidateCommittee = Record<string, number>;
 

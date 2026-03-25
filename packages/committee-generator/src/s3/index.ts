@@ -1,22 +1,22 @@
 import {
-  _Object,
+  type _Object,
   CopyObjectCommand,
   DeleteObjectsCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
-  S3ClientConfig,
+  type S3ClientConfig,
 } from '@aws-sdk/client-s3';
-import { networkMetadata } from '../algod';
-import { config } from '../config';
+import { networkMetadata } from '../algod.ts';
+import { config } from '../config.ts';
 import { createReadStream } from 'fs';
 import { stat as fsStat } from 'fs/promises';
 import pMap from 'p-map';
-import { formatBytes } from '../cache/utils';
-import { committeeIdToSafeFileName, getMD5Hash, walkDir } from '../utils';
+import { formatBytes } from '../cache/utils.ts';
+import { committeeIdToSafeFileName, getMD5Hash, walkDir } from '../utils.ts';
 import { relative } from 'path';
-import { getCommitteeID, loadCommittee } from '../committee';
+import { getCommitteeID, loadCommittee } from '../committee.ts';
 
 // Initialize S3 client
 let s3Client: S3Client | null = null;

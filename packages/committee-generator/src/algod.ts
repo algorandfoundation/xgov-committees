@@ -1,5 +1,5 @@
 import { Algodv2 } from 'algosdk';
-import { config } from './config';
+import { config } from './config.ts';
 
 export const algod = new Algodv2(config.algodToken, config.algodServer, config.algodPort);
 
