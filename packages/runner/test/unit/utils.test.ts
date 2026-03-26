@@ -6,16 +6,18 @@ describe("crossed100KBoundary", () => {
     { from: 550_000, to: 599_999, expected: false, label: "within same window" },
     { from: 550_000, to: 699_999, expected: true, label: "crosses boundary" },
     { from: 550_000, to: 600_000, expected: true, label: "crosses boundary (`to` inclusive)" },
+    { from: 500_000, to: 500_001, expected: true, label: "one step after boundary (`to` inclusive)" },
     { from: 100_000, to: 150_000, expected: true, label: "crosses boundary (`from` inclusive)" },
     { from: 800_000, to: 1_000_500, expected: true, label: "crosses multiple boundaries" },
-    { from: 99_999, to: 100_000, expected: true, label: "one step to boundary" },
+    { from: 399_999, to: 400_000, expected: true, label: "one step to boundary" },
+    { from: 499_000, to: 499_000, expected: false, label: "same block, no boundary crossed" },
+    { from: 500_000, to: 500_000, expected: true, label: "same block, boundary crossed" },
   ])("$label: [$from, $to] → $expected", ({ from, to, expected }) => {
     expect(crossed100KBoundary(from, to)).toBe(expected);
   });
 
-  it("throws when from >= to", () => {
+  it("throws when from > to", () => {
     expect(() => crossed100KBoundary(100_001, 100_000)).toThrow();
-    expect(() => crossed100KBoundary(100_000, 100_000)).toThrow();
   });
 });
 
