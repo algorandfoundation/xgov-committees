@@ -76,12 +76,5 @@ Override via environment variables or an `.env` file at `/opt/xgov-committees/.e
 
 ## Deploy
 
-The service expects the full monorepo at `/opt/xgov-committees/`, built from the root with `pnpm install && pnpm run build` (builds both `runner` and `committee-generator`).
-
-**Requirements:**
-
-- Node.js >= 20.19.0 and pnpm on the server
-- A dedicated `xgov-committees-runner` system user (the service runs unprivileged)
-- A `.env` file at `/opt/xgov-committees/.env` with `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` (see [Configuration](#configuration)). Must be readable by the service user's group (`root:xgov-committees-runner`, mode `640`)
-- A state directory at `/var/lib/xgov-committees-runner` owned by the service user
-- The systemd units from `systemd/` installed in `/etc/systemd/system/` — see [systemd/README.md](systemd/README.md) for unit configuration details
+- See [systemd/DEPLOY.md](systemd/DEPLOY.md) for the full deployment playbook (production and test setup).
+- See [systemd/README.md](systemd/README.md) for unit configuration details.
