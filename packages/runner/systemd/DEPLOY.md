@@ -23,18 +23,14 @@ sudo rm -rf packages/committee-generator/dist packages/runner/dist
 sudo pnpm run build
 ```
 
-> All files under `/opt/xgov-committees` are root-owned. The service only needs read access. Code updates (`git pull`, `pnpm install`, `pnpm run build`) will also need `sudo`.
+> All files under `/opt/xgov-committees` are root-owned. Code updates (`git pull`, `pnpm install`, `pnpm run build`) will also need `sudo`.
 
 ### 3. Create data directories
 
-The service user can't create directories under `/var/lib/` or `/var/cache/`, so these must be done as root:
-
 ```bash
-# Runner local state (persists across runs)
 sudo mkdir -p /var/lib/xgov-committees-runner
 sudo chown xgov-committees-runner: /var/lib/xgov-committees-runner
 
-# Generator block cache (read + write — stores block headers, proposers, committees)
 sudo mkdir -p /var/cache/xgov-committees/data
 sudo chown xgov-committees-runner: /var/cache/xgov-committees/data
 ```
@@ -47,7 +43,7 @@ sudo cp /opt/xgov-committees/.env.example /opt/xgov-committees/.env
 sudo chmod 600 /opt/xgov-committees/.env
 ```
 
-> The file is root-owned with `600` permissions. This is intentional — systemd reads `EnvironmentFile` as root before dropping privileges to the service user.
+> Root-owned with `600` — systemd reads `EnvironmentFile` as root before dropping privileges to the service user.
 
 ### 5. Install systemd units
 
@@ -65,10 +61,11 @@ sudo systemctl enable --now xgov-committees-runner.timer
 ```bash
 systemctl status xgov-committees-runner.timer
 systemctl status xgov-committees-runner.service
-systemctl list-timers | grep xgov
 ```
 
-## Test Setup (run as your user, e.g. `sofi`)
+## Test Setup
+
+Run as your own user (not root). Replace `<your-username>` with your actual username throughout.
 
 ### 1. Clone and build
 
@@ -81,7 +78,7 @@ rm -rf packages/committee-generator/dist packages/runner/dist
 pnpm run build
 ```
 
-> Always `rm -rf dist` before building. `tsc` doesn't delete stale output files, so old extensionless imports or moved files can linger and cause runtime errors.
+> Always `rm -rf dist` before building — `tsc` doesn't delete stale output files.
 
 ### 2. Create .env
 
@@ -90,45 +87,61 @@ cp .env.example .env
 # Edit with your values
 ```
 
-In general, replace `/opt` with `/home/<user>` in paths (e.g. `COMMITTEE_GENERATOR_PATH`, `STATE_DIR`). Set `DATA_PATH` for generator's block cache conveniently.
+Replace `/opt` with `/home/<your-username>` in paths (`COMMITTEE_GENERATOR_PATH`, `STATE_DIR`). Set `DATA_PATH` for the generator's block cache.
 
-### 3. Install systemd units
+### 3. Create data directories
 
-Symlink the service and timer (symlink lets repo changes take effect immediately):
+```bash
+mkdir -p ~/xgov-committees/packages/runner/state
+
+# Use whatever path you set as DATA_PATH in .env
+sudo mkdir -p /var/cache/xgov-committees/data
+sudo chown "$USER": /var/cache/xgov-committees/data
+```
+
+> If you delete these to reset, re-run to restore permissions.
+
+### 4. Install systemd units
 
 ```bash
 sudo ln -s ~/xgov-committees/packages/runner/systemd/runner.service /etc/systemd/system/xgov-committees-runner.service
 sudo ln -s ~/xgov-committees/packages/runner/systemd/runner.timer /etc/systemd/system/xgov-committees-runner.timer
 ```
 
-### 4. Create systemd override
-
-Override paths and user to run from user's home directory:
+### 5. Create systemd override
 
 ```bash
 sudo systemctl edit xgov-committees-runner.service
 ```
 
-Paste:
-
 ```ini
 [Service]
-WorkingDirectory=/home/sofi/xgov-committees/packages/runner
+WorkingDirectory=/home/<your-username>/xgov-committees/packages/runner
 EnvironmentFile=
-EnvironmentFile=/home/sofi/xgov-committees/.env
+EnvironmentFile=/home/<your-username>/xgov-committees/.env
 ExecStart=
-ExecStart=/usr/bin/node /home/sofi/xgov-committees/packages/runner/dist/index.js
+ExecStart=/usr/bin/node /home/<your-username>/xgov-committees/packages/runner/dist/index.js
 ExecStopPost=
-ExecStopPost=-/usr/bin/node /home/sofi/xgov-committees/packages/runner/dist/notify-slack.js --exit-status=${EXIT_STATUS} --service-result=${SERVICE_RESULT} --hostname=%H --unit-name=%n
-User=sofi
+ExecStopPost=-/usr/bin/node /home/<your-username>/xgov-committees/packages/runner/dist/notify-slack.js --exit-status=${EXIT_STATUS} --service-result=${SERVICE_RESULT} --hostname=%H --unit-name=%n
+User=<your-username>
 SupplementaryGroups=systemd-journal
 ```
 
-> The empty `ExecStart=` / `ExecStopPost=` / `EnvironmentFile=` lines clear the base unit's values before setting new ones. Without them, systemd appends and ends up with duplicate entries.
+> The empty lines clear the base unit's values before setting new ones — without them, systemd appends and you get duplicates.
 
-> `SupplementaryGroups=systemd-journal` grants the service process read access to the journal, required for the Slack notifier to include log tails in failure notifications. Optionally, add your user to the group too (`sudo usermod -aG systemd-journal sofi`) to tail logs without `sudo`.
+> `SupplementaryGroups=systemd-journal` lets the Slack notifier read the journal. Alternatively: `sudo usermod -aG systemd-journal <your-username>`.
 
-### 5. Start
+### 6. Override runtime limits (optional)
+
+```bash
+sudo systemctl edit xgov-committees-runner.service
+# Add under [Service]: RuntimeMaxSec=40min
+
+sudo systemctl edit xgov-committees-runner.timer
+# Add under [Timer]: OnUnitInactiveSec= (empty to clear) then OnUnitInactiveSec=10min
+```
+
+### 7. Start
 
 ```bash
 sudo systemctl daemon-reload
@@ -143,9 +156,19 @@ sudo systemctl stop xgov-committees-runner.service
 sudo systemctl disable xgov-committees-runner.timer
 sudo rm /etc/systemd/system/xgov-committees-runner.service
 sudo rm /etc/systemd/system/xgov-committees-runner.timer
-sudo rm -r /etc/systemd/system/xgov-committees-runner.service.d
+sudo rm -rf /etc/systemd/system/xgov-committees-runner.service.d
+sudo rm -rf /etc/systemd/system/xgov-committees-runner.timer.d
 sudo systemctl daemon-reload
 ```
+
+To also reset state and cache:
+
+```bash
+rm -rf ~/xgov-committees/packages/runner/state
+sudo rm -rf /var/cache/xgov-committees/data
+```
+
+> After deleting these, follow step 3 to recreate them with the correct permissions before restarting.
 
 ## Operations
 
@@ -155,13 +178,11 @@ sudo systemctl daemon-reload
 sudo journalctl -u xgov-committees-runner.service -f --output=cat
 ```
 
-> Use `--output=cat` to see raw stdout without journald blob truncation.
-
 ### Check status
 
 ```bash
-systemctl list-timers | grep xgov
-systemctl list-units | grep xgov
+systemctl status xgov-committees-runner.timer
+systemctl status xgov-committees-runner.service
 ```
 
 ### Stop
@@ -189,13 +210,11 @@ sudo systemctl start xgov-committees-runner.service
 sudo systemctl kill --signal=SIGKILL xgov-committees-runner.service
 ```
 
-> SIGTERM (normal stop) exits cleanly with code 0 — no Slack notification (by design).
-> SIGKILL exits with code 137 / `SERVICE_RESULT=signal` — Slack notification fires.
+> SIGTERM exits cleanly with code 0 — no Slack notification. SIGKILL exits with `SERVICE_RESULT=signal` — Slack notification fires.
 
 ### Code update
 
 ```bash
-# Stop first to prevent a run mid-build
 sudo systemctl stop xgov-committees-runner.timer
 sudo systemctl stop xgov-committees-runner.service
 
