@@ -38,11 +38,11 @@ const baseArgs = {
 };
 
 describe("isFailure", () => {
-  it("returns false for 'success'", () => {
-    expect(isFailure("success")).toBe(false);
+  it.each(["success", "timeout"])("returns false for '%s'", (result) => {
+    expect(isFailure(result)).toBe(false);
   });
 
-  it.each(["exit-code", "signal", "timeout", "watchdog"])("returns true for '%s'", (result) => {
+  it.each(["exit-code", "signal", "watchdog", "core-dump", "start-limit-hit"])("returns true for '%s'", (result) => {
     expect(isFailure(result)).toBe(true);
   });
 });
