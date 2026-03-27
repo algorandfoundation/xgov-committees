@@ -43,6 +43,8 @@ pnpm run lint:fix     # lint + auto-fix
 pnpm run format       # format code
 ```
 
+> **Note:** `.prettierrc.json` mirrors the root config except for `printWidth` (120 vs 100) and `singleQuote` (false vs true).
+
 ## Testing
 
 ```bash
