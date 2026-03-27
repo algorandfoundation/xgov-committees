@@ -6,11 +6,11 @@ Triggered by a systemd timer every 50 minutes. See [systemd/README.md](systemd/R
 
 ## How it works
 
-Per ARC-86, an xGov Committee is selected from a governance period `(Bi, Bf)` — the block range `[Bi; Bf)` from which xGov voting power is derived. Each xGov's voting power is proportional to the number of blocks they proposed in that range. Consecutive governance periods shift by 1M blocks: `(Bi, Bf)` → `(Bi+1M, Bf+1M)`, with `Bf - Bi = 3M` blocks (the committee selection range). Once the chain passes `Bf`, the cohort for that period can be computed and a new committee file is generated. Committee file generation is automatically handled by the `committee-generator` once a million round is surpassed.
+Per ARC-86, an xGov Committee is selected from a governance period `(Bi, Bf)` — the block range `[Bi; Bf)` from which xGov voting power is derived. Each xGov's voting power equals the number of blocks they proposed in that range. Consecutive governance periods shift by 1M blocks: `(Bi, Bf)` → `(Bi+1M, Bf+1M)`, with `Bf - Bi = 3M` blocks (the committee selection range). Once the chain passes `Bf`, the cohort for that period can be computed and a new committee file is generated. Committee file generation is automatically handled by the `committee-generator` once a million round is surpassed.
 
 The runner tracks the last fully processed governance period and warms the cache for the next one. On each invocation the service loop evaluates three ordered cases:
 
-1. **Catch-up**: If the chain is past the last processed period, process the full 3M block range immediately. This handles bootstrapping and periods that were missed while the service was offline.
+1. **Catch-up**: If the chain is past the last processed end round, process the full 3M block range immediately. This handles bootstrapping and periods that were missed while the service was offline.
 2. **Close to period end**: If the chain is within 900 blocks of a million round, wait for it and process the remaining period blocks + committee file generation.
 3. **100K warming**: If a 100K-block boundary has been crossed since the last write-cache call, run the `committee-generator` for the current governance period (even if not finished yet), expecting to reach the chain tip and exiting silently (`retryOnTip=false`). This keeps the block-header cache warm so that the final committee calculation at million round is fast.
 
