@@ -119,7 +119,7 @@ export const getARC28Prefix = (eventSignature: string): Buffer<ArrayBufferLike> 
 
 /**
  * Utility to decode event from raw log
- * @param abiString ABI string of the event
+ * @param eventSignature ABI string of the event
  * @param rawLog Raw log bytes
  * @param keys Keys of the event fields
  * @returns Decoded event T object
