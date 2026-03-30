@@ -100,7 +100,6 @@ const argvConfig = [
   },
   {
     name: 'indexer-server',
-    short: 'is',
     type: 'string',
     description: 'indexer server hostname',
     envVar: 'INDEXER_SERVER',
@@ -108,7 +107,6 @@ const argvConfig = [
   },
   {
     name: 'indexer-port',
-    short: 'ip',
     type: 'number',
     description: 'indexer server port',
     envVar: 'INDEXER_PORT',
@@ -116,7 +114,6 @@ const argvConfig = [
   },
   {
     name: 'indexer-token',
-    short: 'it',
     type: 'string',
     description: 'indexer server token',
     envVar: 'INDEXER_TOKEN',
