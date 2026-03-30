@@ -18,6 +18,7 @@ export class TipReachedError extends Error {
   }
 }
 
+const RETRY_BACKOFF_MS = 1000; // 1 second
 const DELTA_TOLERANCE = 5n;
 
 /**
@@ -123,27 +124,36 @@ const _getBlock = async (rnd: number, skipCache: boolean = false): Promise<Block
     }
   }
 
-  let data: modelsv2.BlockResponse;
-
-  try {
-    data = await algod.block(rnd).headerOnly(true).do();
-  } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : String(e);
-    // Check if block is not available (404 error from ledger)
-    if (errorMessage.includes('failed to retrieve information from the ledger')) {
-      const { lastRound } = await algod.status().do();
-      if (!isGenuineTipReached(BigInt(rnd), lastRound)) {
-        await fatalError(
-          new Error(
-            `Block ${rnd} request failed unexpectedly (lastRound: ${lastRound}, delta exceeds tolerance: ${DELTA_TOLERANCE})`,
-          ),
-        );
+  const fetchFromNode = async (): Promise<modelsv2.BlockResponse> => {
+    try {
+      return await algod.block(rnd).headerOnly(true).do();
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      // Check if block is not available (404 error from ledger)
+      if (errorMessage.includes('failed to retrieve information from the ledger')) {
+        const { lastRound } = await algod.status().do();
+        if (!isGenuineTipReached(BigInt(rnd), lastRound)) {
+          await fatalError(
+            new Error(
+              `Block ${rnd} request failed unexpectedly (lastRound: ${lastRound}, delta exceeds tolerance: ${DELTA_TOLERANCE})`,
+            ),
+          );
+        }
+        throw new TipReachedError(BigInt(rnd));
       }
-      throw new TipReachedError(BigInt(rnd));
-    }
 
-    // rethrow other errors
-    throw e;
+      // rethrow other errors
+      throw e;
+    }
+  };
+
+  let data: modelsv2.BlockResponse;
+  try {
+    data = await fetchFromNode();
+  } catch (e) {
+    if (e instanceof TipReachedError) throw e;
+    await sleep(RETRY_BACKOFF_MS);
+    data = await fetchFromNode();
   }
 
   setCache(rnd, data.block.header);
