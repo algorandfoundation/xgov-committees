@@ -11,7 +11,10 @@ import { waitForBlock, runWriteCache, run, getActiveChild } from "../../src/serv
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 vi.mock("node:timers/promises", () => ({ setTimeout: vi.fn().mockResolvedValue(undefined) }));
-vi.mock("../../src/state.ts", () => ({ loadState: vi.fn(), saveState: vi.fn() }));
+vi.mock("../../src/state.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/state.ts")>();
+  return { ...actual, loadState: vi.fn(), saveState: vi.fn() };
+});
 vi.mock("../../src/config.ts", () => ({}));
 vi.mock("@algorandfoundation/algokit-utils", () => ({
   AlgorandClient: { fromConfig: vi.fn() },
@@ -23,8 +26,7 @@ const mockSaveState = vi.mocked(saveState);
 const mockFromConfig = vi.mocked(AlgorandClient.fromConfig);
 
 const MAINNET_GENESIS_HASH = "wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
-const ROUND_BUFFER = 21;
-const FIRST_SYNC_ROUND = 50_000_000;
+const TIP_BUFFER = 21;
 
 function makeChildProcess(exitCode: number | null = 0, signal: string | null = null) {
   const emitter = new EventEmitter() as ChildProcess;
@@ -133,6 +135,19 @@ describe("runWriteCache", () => {
     expect(mockSpawn).toHaveBeenCalledOnce();
   });
 
+  it("resolves without retrying when retryOnTip is false and generator hits chain tip", async () => {
+    const { child, emitClose } = makeChildProcess(10);
+    mockSpawn.mockImplementation(() => {
+      process.nextTick(emitClose);
+      return child;
+    });
+
+    await runWriteCache(makeAlgorandClient(vi.fn()), "/fake/path/gen.js", 57_996_051, 58_000_042, false);
+
+    expect(mockSpawn).toHaveBeenCalledOnce();
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining("expected for warming"));
+  });
+
   it("retries and resolves when first run hits chain tip and retry succeeds", async () => {
     const { child: child1, emitClose: close1 } = makeChildProcess(10);
     const { child: child2, emitClose: close2 } = makeChildProcess(0);
@@ -158,7 +173,7 @@ describe("runWriteCache", () => {
       ["/fake/path/gen.js", "--mode", "write-cache", "--from-block", "57996051", "--to-block", "58000042"],
       expect.anything(),
     );
-    expect(statusAfterBlock).toHaveBeenCalledWith(58_000_042 + ROUND_BUFFER - 1);
+    expect(statusAfterBlock).toHaveBeenCalledWith(58_000_042 + TIP_BUFFER - 1);
   });
 
   it("rejects when generator hits chain tip on both attempts", async () => {
@@ -278,10 +293,181 @@ describe("run", () => {
     };
   }
 
-  it("does not spawn write-cache when no boundary is crossed", async () => {
-    const { algorand } = makeRunAlgorand(58_000_042n);
+  // All tests use lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 } as base state.
+  function makeState(lastCacheRound: number, startRound = 50e6, endRound = 53e6) {
+    return { lastGovernancePeriod: { startRound, endRound }, lastCacheRound, updatedAt: "" };
+  }
+
+  it("bootstraps from initial governance period when no state file exists", async () => {
+    // null, bootstrap state (49M,52M) => first period (50M,53M)
+    // round 59.1M: catches up through (56M,59M), warms (57M,60M), then guard breaks
+    const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
+    const getTransactionParams = vi.fn().mockReturnValue({
+      do: async () => ({ firstValid: 59_112_478n, genesisHash }),
+    });
+    mockFromConfig.mockReturnValue({
+      client: { algod: { getTransactionParams, statusAfterBlock: vi.fn() } },
+    } as unknown as AlgorandClient);
+    mockLoadState
+      .mockReturnValueOnce(null) // bootstrap
+      .mockReturnValueOnce(makeState(53e6, 50e6, 53e6))
+      .mockReturnValueOnce(makeState(54e6, 51e6, 54e6))
+      .mockReturnValueOnce(makeState(55e6, 52e6, 55e6))
+      .mockReturnValueOnce(makeState(56e6, 53e6, 56e6))
+      .mockReturnValueOnce(makeState(57e6, 54e6, 57e6))
+      .mockReturnValueOnce(makeState(58e6, 55e6, 58e6))
+      .mockReturnValueOnce(makeState(59e6, 56e6, 59e6)) // after last catch-up → warming
+      .mockReturnValueOnce(makeState(59_112_478, 56e6, 59e6)); // after warming → guard breaks
+
+    const { child, emitClose } = makeChildProcess(0);
+    mockSpawn.mockImplementation(() => {
+      process.nextTick(emitClose);
+      return child;
+    });
+
+    await run(makeConfig());
+
+    // first spawn starts from initial period
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      1,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "50000000", "--to-block", "53000000"],
+      expect.anything(),
+    );
+    expect(mockSaveState).toHaveBeenNthCalledWith(
+      1,
+      stateDir,
+      MAINNET_GENESIS_HASH,
+      999,
+      expect.objectContaining({ lastGovernancePeriod: { startRound: 50e6, endRound: 53e6 }, lastCacheRound: 53e6 }),
+    );
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining("bootstrapping"));
+  });
+
+  it("catches up across multiple periods from bootstrap, then warms current period", async () => {
+    // null state, current round 56.4M => 4 catch-ups (50M,53M) to (53M,56M) + 100K warming for (54M,57M)
+    const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
+    const getTransactionParams = vi.fn().mockReturnValue({
+      do: async () => ({ firstValid: 56_412_837n, genesisHash }),
+    });
+    mockFromConfig.mockReturnValue({
+      client: { algod: { getTransactionParams, statusAfterBlock: vi.fn() } },
+    } as unknown as AlgorandClient);
+    mockLoadState
+      .mockReturnValueOnce(null) // bootstrap
+      .mockReturnValueOnce(makeState(53e6, 50e6, 53e6))
+      .mockReturnValueOnce(makeState(54e6, 51e6, 54e6))
+      .mockReturnValueOnce(makeState(55e6, 52e6, 55e6))
+      .mockReturnValueOnce(makeState(56e6, 53e6, 56e6)) // after last catch-up
+      .mockReturnValueOnce(makeState(56_412_837, 53e6, 56e6)); // after warming
+
+    const { child, emitClose } = makeChildProcess(0);
+    mockSpawn.mockImplementation(() => {
+      process.nextTick(emitClose);
+      return child;
+    });
+
+    await run(makeConfig());
+
+    // 4 catch-up spawns
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      1,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "50000000", "--to-block", "53000000"],
+      expect.anything(),
+    );
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      2,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "51000000", "--to-block", "54000000"],
+      expect.anything(),
+    );
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      3,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "52000000", "--to-block", "55000000"],
+      expect.anything(),
+    );
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      4,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "53000000", "--to-block", "56000000"],
+      expect.anything(),
+    );
+    // 5th spawn: warming for current period
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      5,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "54000000", "--to-block", "57000000"],
+      expect.anything(),
+    );
+    expect(mockSpawn).toHaveBeenCalledTimes(5);
+    expect(mockSaveState).toHaveBeenCalledTimes(5);
+    expect(mockSaveState).toHaveBeenLastCalledWith(
+      stateDir,
+      MAINNET_GENESIS_HASH,
+      999,
+      expect.objectContaining({ lastCacheRound: 56_412_837 }),
+    );
+  });
+
+  it("catches up from existing state after downtime, then warms current period", async () => {
+    // state at (54M,57M), round 59.1M => 2 catch-ups (55M,58M) (56M,59M) + warming for (57M,60M)
+    const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
+    const getTransactionParams = vi.fn().mockReturnValue({
+      do: async () => ({ firstValid: 59_112_478n, genesisHash }),
+    });
+    mockFromConfig.mockReturnValue({
+      client: { algod: { getTransactionParams, statusAfterBlock: vi.fn() } },
+    } as unknown as AlgorandClient);
+    mockLoadState
+      .mockReturnValueOnce(makeState(57e6, 54e6, 57e6))
+      .mockReturnValueOnce(makeState(58e6, 55e6, 58e6))
+      .mockReturnValueOnce(makeState(59e6, 56e6, 59e6)) // after last catch-up
+      .mockReturnValueOnce(makeState(59_112_478, 56e6, 59e6)); // after warming
+
+    const { child, emitClose } = makeChildProcess(0);
+    mockSpawn.mockImplementation(() => {
+      process.nextTick(emitClose);
+      return child;
+    });
+
+    await run(makeConfig());
+
+    // 2 catch-up spawns
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      1,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "55000000", "--to-block", "58000000"],
+      expect.anything(),
+    );
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      2,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "56000000", "--to-block", "59000000"],
+      expect.anything(),
+    );
+    // 3rd spawn: warming for current period
+    expect(mockSpawn).toHaveBeenNthCalledWith(
+      3,
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "57000000", "--to-block", "60000000"],
+      expect.anything(),
+    );
+    expect(mockSpawn).toHaveBeenCalledTimes(3);
+    expect(mockSaveState).toHaveBeenCalledTimes(3);
+    expect(mockSaveState).toHaveBeenLastCalledWith(
+      stateDir,
+      MAINNET_GENESIS_HASH,
+      999,
+      expect.objectContaining({ lastCacheRound: 59_112_478 }),
+    );
+  });
+
+  it("no boundary crossed: does not spawn child", async () => {
+    const { algorand } = makeRunAlgorand(53_500_050n);
     mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
-    mockLoadState.mockReturnValue({ lastProcessedRound: 58_000_040, updatedAt: "" });
+    mockLoadState.mockReturnValue(makeState(53_500_042));
 
     await run(makeConfig());
 
@@ -289,21 +475,20 @@ describe("run", () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it("spawns write-cache and re-evaluates when 100K boundary is crossed", async () => {
+  it("close 1M boundary: waits for period end and spawns write-cache", async () => {
     const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
     const getTransactionParams = vi
       .fn()
-      .mockReturnValueOnce({ do: async () => ({ firstValid: 58_000_042n, genesisHash }) })
-      .mockReturnValueOnce({ do: async () => ({ firstValid: 58_000_050n, genesisHash }) });
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_999_150n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_999_150n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 54_000_000n, genesisHash }) });
     const statusAfterBlock = vi.fn().mockReturnValue({
-      do: async () => ({ lastRound: 58_000_200n }),
+      do: async () => ({ lastRound: BigInt(54_000_021) }),
     });
     mockFromConfig.mockReturnValue({
       client: { algod: { getTransactionParams, statusAfterBlock } },
     } as unknown as AlgorandClient);
-    mockLoadState
-      .mockReturnValueOnce({ lastProcessedRound: 57_996_051, updatedAt: "" })
-      .mockReturnValueOnce({ lastProcessedRound: 58_000_042, updatedAt: "" });
+    mockLoadState.mockReturnValueOnce(makeState(53_999_000)).mockReturnValueOnce(makeState(54e6, 51e6, 54e6));
 
     const { child, emitClose } = makeChildProcess(0);
     mockSpawn.mockImplementation(() => {
@@ -316,7 +501,44 @@ describe("run", () => {
     expect(mockSpawn).toHaveBeenCalledOnce();
     expect(mockSpawn).toHaveBeenCalledWith(
       "node",
-      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "57996052", "--to-block", "58000042"],
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "51000000", "--to-block", "54000000"],
+      expect.anything(),
+    );
+    expect(statusAfterBlock).toHaveBeenCalledWith(54_000_020);
+    expect(mockSaveState).toHaveBeenCalledOnce();
+    expect(mockSaveState).toHaveBeenCalledWith(
+      stateDir,
+      MAINNET_GENESIS_HASH,
+      999,
+      expect.objectContaining({ lastGovernancePeriod: { startRound: 51e6, endRound: 54e6 }, lastCacheRound: 54e6 }),
+    );
+  });
+
+  it("100K boundary crossed: spawns write-cache and re-evaluates", async () => {
+    const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
+    const getTransactionParams = vi
+      .fn()
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_050n, genesisHash }) });
+    const statusAfterBlock = vi.fn();
+    mockFromConfig.mockReturnValue({
+      client: { algod: { getTransactionParams, statusAfterBlock } },
+    } as unknown as AlgorandClient);
+    mockLoadState.mockReturnValueOnce(makeState(53_096_000)).mockReturnValueOnce(makeState(53_200_042));
+
+    const { child, emitClose } = makeChildProcess(0);
+    mockSpawn.mockImplementation(() => {
+      process.nextTick(emitClose);
+      return child;
+    });
+
+    await run(makeConfig());
+
+    expect(mockSpawn).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledWith(
+      "node",
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "51000000", "--to-block", "54000000"],
       expect.anything(),
     );
     expect(mockSaveState).toHaveBeenCalledOnce();
@@ -324,74 +546,32 @@ describe("run", () => {
       stateDir,
       MAINNET_GENESIS_HASH,
       999,
-      expect.objectContaining({ lastProcessedRound: 58_000_042 }),
+      expect.objectContaining({ lastCacheRound: 53_200_042 }),
     );
-    expect(getTransactionParams).toHaveBeenCalledTimes(2);
+    expect(getTransactionParams).toHaveBeenCalledTimes(3);
     expect(mockLoadState).toHaveBeenCalledTimes(2);
     expect(statusAfterBlock).not.toHaveBeenCalled();
     expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining("100K boundary crossed"));
   });
 
-  it("waits for 1M boundary and spawns write-cache when close to 1M and no 100K boundary is crossed", async () => {
-    // currentRound=999_950: closeTo1MBoundary=true (50 blocks from 1M), crossed100KBoundary(999_901, 999_950)=false
+  it("100K boundary crossed: re-evaluates and meets close to 1M boundary", async () => {
     const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
     const getTransactionParams = vi
       .fn()
-      .mockReturnValueOnce({ do: async () => ({ firstValid: 999_950n, genesisHash }) })
-      .mockReturnValueOnce({ do: async () => ({ firstValid: 1_000_050n, genesisHash }) });
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_999_150n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 54_000_000n, genesisHash }) });
     const statusAfterBlock = vi.fn().mockReturnValue({
-      do: async () => ({ lastRound: BigInt(1_000_021) }),
+      do: async () => ({ lastRound: BigInt(54_000_021) }),
     });
     mockFromConfig.mockReturnValue({
       client: { algod: { getTransactionParams, statusAfterBlock } },
     } as unknown as AlgorandClient);
     mockLoadState
-      .mockReturnValueOnce({ lastProcessedRound: 999_900, updatedAt: "" })
-      .mockReturnValueOnce({ lastProcessedRound: 1_000_000, updatedAt: "" });
-
-    const { child, emitClose } = makeChildProcess(0);
-    mockSpawn.mockImplementation(() => {
-      process.nextTick(emitClose);
-      return child;
-    });
-
-    await run(makeConfig());
-
-    expect(mockSpawn).toHaveBeenCalledOnce();
-    expect(mockSpawn).toHaveBeenCalledWith(
-      "node",
-      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "999901", "--to-block", "1000000"],
-      expect.anything(),
-    );
-    expect(statusAfterBlock).toHaveBeenCalledWith(1_000_020);
-    expect(mockSaveState).toHaveBeenCalledOnce();
-    expect(mockSaveState).toHaveBeenCalledWith(
-      stateDir,
-      MAINNET_GENESIS_HASH,
-      999,
-      expect.objectContaining({ lastProcessedRound: 1_000_000 }),
-    );
-  });
-
-  it("spawns 100K write-cache then 1M write-cache when both boundaries are crossed", async () => {
-    // currentRound=999_950, nextRoundToProcess=899_001:
-    //   crossed100KBoundary(899_001, 999_950)=true (900K boundary in range)
-    //   closeTo1MBoundary(999_950)=true (50 blocks from 1M)
-    //   => 1M write-cache from = currentRound + 1 = 999_951
-    const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
-    const getTransactionParams = vi
-      .fn()
-      .mockReturnValueOnce({ do: async () => ({ firstValid: 999_950n, genesisHash }) })
-      .mockReturnValueOnce({ do: async () => ({ firstValid: 1_000_050n, genesisHash }) });
-    const statusAfterBlock = vi.fn().mockReturnValue({
-      do: async () => ({ lastRound: BigInt(1_000_021) }),
-    });
-    mockFromConfig.mockReturnValue({
-      client: { algod: { getTransactionParams, statusAfterBlock } },
-    } as unknown as AlgorandClient);
-    mockLoadState
-      .mockReturnValueOnce({ lastProcessedRound: 899_000, updatedAt: "" })
-      .mockReturnValueOnce({ lastProcessedRound: 1_000_000, updatedAt: "" });
+      .mockReturnValueOnce(makeState(53_096_000))
+      .mockReturnValueOnce(makeState(53_200_042))
+      .mockReturnValueOnce(makeState(54e6, 51e6, 54e6));
 
     const { child, emitClose } = makeChildProcess(0);
     mockSpawn.mockImplementation(() => {
@@ -405,29 +585,52 @@ describe("run", () => {
     expect(mockSpawn).toHaveBeenNthCalledWith(
       1,
       "node",
-      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "899001", "--to-block", "999950"],
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "51000000", "--to-block", "54000000"],
       expect.anything(),
     );
     expect(mockSpawn).toHaveBeenNthCalledWith(
       2,
       "node",
-      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "999951", "--to-block", "1000000"],
+      ["/fake/generator.js", "--mode", "write-cache", "--from-block", "51000000", "--to-block", "54000000"],
       expect.anything(),
     );
-    expect(statusAfterBlock).toHaveBeenCalledWith(1_000_020);
-    expect(mockSaveState).toHaveBeenCalledOnce();
+    expect(statusAfterBlock).toHaveBeenCalledWith(54_000_020);
+    expect(mockSaveState).toHaveBeenCalledTimes(2);
+  });
+
+  it("100K boundary crossed: continues without error when generator hits tip", async () => {
+    const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
+    const getTransactionParams = vi
+      .fn()
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_050n, genesisHash }) });
+    mockFromConfig.mockReturnValue({
+      client: { algod: { getTransactionParams, statusAfterBlock: vi.fn() } },
+    } as unknown as AlgorandClient);
+    mockLoadState.mockReturnValueOnce(makeState(53_096_000)).mockReturnValueOnce(makeState(53_200_042));
+
+    const { child, emitClose } = makeChildProcess(10); // tip
+    mockSpawn.mockImplementation(() => {
+      process.nextTick(emitClose);
+      return child;
+    });
+
+    await expect(run(makeConfig())).resolves.toBeUndefined();
+    expect(mockSpawn).toHaveBeenCalledOnce(); // no retry
+    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining("expected for warming"));
     expect(mockSaveState).toHaveBeenCalledWith(
       stateDir,
       MAINNET_GENESIS_HASH,
       999,
-      expect.objectContaining({ lastProcessedRound: 1_000_000 }),
+      expect.objectContaining({ lastCacheRound: 53_200_042 }),
     );
   });
 
   it("throws when generator exits with fatal error", async () => {
-    const { algorand } = makeRunAlgorand(58_000_042n);
+    const { algorand } = makeRunAlgorand(55_000_000n);
     mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
-    mockLoadState.mockReturnValue({ lastProcessedRound: 0, updatedAt: "" });
+    mockLoadState.mockReturnValue(makeState(53e6));
 
     const { child, emitClose } = makeChildProcess(1);
     mockSpawn.mockImplementation(() => {
@@ -439,17 +642,12 @@ describe("run", () => {
   });
 
   it("throws when generator hits chain tip on both attempts", async () => {
-    const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
-    const getTransactionParams = vi.fn().mockReturnValue({
-      do: async () => ({ firstValid: 58_000_042n, genesisHash }),
+    const { algorand, statusAfterBlock } = makeRunAlgorand(55_000_000n);
+    statusAfterBlock.mockReturnValue({
+      do: async () => ({ lastRound: BigInt(55_000_100) }),
     });
-    const statusAfterBlock = vi.fn().mockReturnValue({
-      do: async () => ({ lastRound: 58_000_200n }),
-    });
-    mockFromConfig.mockReturnValue({
-      client: { algod: { getTransactionParams, statusAfterBlock } },
-    } as unknown as AlgorandClient);
-    mockLoadState.mockReturnValue({ lastProcessedRound: 57_996_051, updatedAt: "" });
+    mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
+    mockLoadState.mockReturnValue(makeState(53e6));
 
     const { child: child1, emitClose: close1 } = makeChildProcess(10);
     const { child: child2, emitClose: close2 } = makeChildProcess(10);
@@ -466,66 +664,25 @@ describe("run", () => {
     await expect(run(makeConfig())).rejects.toThrow("generator reached chain tip even after retrying");
   });
 
-  it("bootstraps from FIRST_SYNC_ROUND when no state file exists", async () => {
-    const { algorand } = makeRunAlgorand(58_000_042n);
+  it("throws on first iteration when algod round is not ahead of the last cache round", async () => {
+    const { algorand } = makeRunAlgorand(53_500_042n);
     mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
-    mockLoadState.mockReturnValueOnce(null).mockReturnValueOnce({ lastProcessedRound: 58_000_042, updatedAt: "" });
+    mockLoadState.mockReturnValue(makeState(53_500_042));
 
-    const { child, emitClose } = makeChildProcess(0);
-    mockSpawn.mockImplementation(() => {
-      process.nextTick(emitClose);
-      return child;
-    });
-
-    await run(makeConfig());
-
-    expect(mockSpawn).toHaveBeenCalledOnce();
-    expect(mockSpawn).toHaveBeenCalledWith(
-      "node",
-      [
-        "/fake/generator.js",
-        "--mode",
-        "write-cache",
-        "--from-block",
-        String(FIRST_SYNC_ROUND),
-        "--to-block",
-        "58000042",
-      ],
-      expect.anything(),
-    );
-    expect(mockSaveState).toHaveBeenCalledOnce();
-    expect(mockSaveState).toHaveBeenCalledWith(
-      stateDir,
-      MAINNET_GENESIS_HASH,
-      999,
-      expect.objectContaining({ lastProcessedRound: 58_000_042 }),
-    );
-    expect(vi.mocked(console.log)).toHaveBeenCalledWith(expect.stringContaining(String(FIRST_SYNC_ROUND)));
+    await expect(run(makeConfig())).rejects.toThrow("not ahead of the last cache");
   });
 
-  it("throws on first iteration when algod round is not ahead of the next round to process", async () => {
-    // currentRound (58_000_040) == nextRoundToProcess (58_000_040)
-    const { algorand } = makeRunAlgorand(58_000_040n);
-    mockFromConfig.mockReturnValue(algorand as unknown as AlgorandClient);
-    mockLoadState.mockReturnValue({ lastProcessedRound: 58_000_039, updatedAt: "" });
-
-    await expect(run(makeConfig())).rejects.toThrow("not ahead of the next round to process");
-  });
-
-  it("exits cleanly on second iteration when algod has not advanced past the last processed round", async () => {
-    // Iteration 1: 100K boundary crossed → write-cache, saveState.
-    // Iteration 2: algod still returns the same round (timer fired before new blocks) → clean break.
+  it("exits cleanly on second iteration when algod has not advanced past the last cache round", async () => {
     const genesisHash = new Uint8Array(Buffer.from(MAINNET_GENESIS_HASH, "base64"));
     const getTransactionParams = vi
       .fn()
-      .mockReturnValueOnce({ do: async () => ({ firstValid: 58_000_042n, genesisHash }) })
-      .mockReturnValueOnce({ do: async () => ({ firstValid: 58_000_042n, genesisHash }) });
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) })
+      .mockReturnValueOnce({ do: async () => ({ firstValid: 53_200_042n, genesisHash }) });
     mockFromConfig.mockReturnValue({
       client: { algod: { getTransactionParams, statusAfterBlock: vi.fn() } },
     } as unknown as AlgorandClient);
-    mockLoadState
-      .mockReturnValueOnce({ lastProcessedRound: 57_996_051, updatedAt: "" })
-      .mockReturnValueOnce({ lastProcessedRound: 58_000_042, updatedAt: "" });
+    mockLoadState.mockReturnValueOnce(makeState(53_096_000)).mockReturnValueOnce(makeState(53_200_042));
 
     const { child, emitClose } = makeChildProcess(0);
     mockSpawn.mockImplementation(() => {
