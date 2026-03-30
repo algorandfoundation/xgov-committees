@@ -1,13 +1,13 @@
 import { decodeUint64, encodeAddress } from 'algosdk';
-import { algod } from './algod';
-import { config } from './config';
+import { algod } from './algod.ts';
+import { config } from './config.ts';
 import pMap from 'p-map';
-import { getCachePath } from './cache/utils';
-import { ensureCacheSubPathExists } from './cache';
+import { getCachePath } from './cache/utils.ts';
+import { ensureCacheSubPathExists } from './cache/index.ts';
 import { join } from 'path';
 import { readFile, writeFile } from 'fs/promises';
-import { clearLine, fsExists } from './utils';
-import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
+import { clearLine, fsExists } from './utils.ts';
+import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3/index.ts';
 
 /*
     Gets subscribed xGovs from registry contract

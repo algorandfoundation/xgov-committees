@@ -1,7 +1,7 @@
-import { TipReachedError } from './blocks';
-import { ensureCacheSubPathExists } from './cache';
-import { CacheMode, config } from './config';
-import { runUseCache, runValidateCache, runWriteCache } from './modes';
+import { TipReachedError } from './blocks.ts';
+import { ensureCacheSubPathExists } from './cache/index.ts';
+import { type CacheMode, config } from './config.ts';
+import { runUseCache, runValidateCache, runWriteCache } from './modes/index.ts';
 import {
   ExitCode,
   expectedExit,
@@ -10,7 +10,7 @@ import {
   enableAsyncTracking,
   ShuttingDownError,
   awaitShutdown,
-} from './shutdown';
+} from './shutdown.ts';
 
 const { cacheMode, fromBlock, toBlock } = config;
 

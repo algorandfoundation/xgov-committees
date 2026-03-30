@@ -1,18 +1,20 @@
 import pMap from 'p-map';
-import { config } from './config';
-import { algod, networkMetadata } from './algod';
-import { subtractCached, getCache, setCache } from './cache';
-import { chunk, clearLine, formatDuration, sleep } from './utils';
-import { BlockHeader, modelsv2 } from 'algosdk';
-import { guardWhileNotShuttingDown, fatalError } from './shutdown';
+import { config } from './config.ts';
+import { algod, networkMetadata } from './algod.ts';
+import { subtractCached, getCache, setCache } from './cache/index.ts';
+import { chunk, clearLine, formatDuration, sleep } from './utils.ts';
+import { type BlockHeader, modelsv2 } from 'algosdk';
+import { guardWhileNotShuttingDown, fatalError } from './shutdown.ts';
 
 /**
  * Error thrown when attempting to fetch a block beyond the blockchain tip.
  */
 export class TipReachedError extends Error {
-  constructor(public readonly blockNumber: bigint) {
+  readonly blockNumber: bigint;
+  constructor(blockNumber: bigint) {
     super(`Block ${blockNumber} not available. The tip of the blockchain has been reached.`);
     this.name = 'TipReachedError';
+    this.blockNumber = blockNumber;
   }
 }
 

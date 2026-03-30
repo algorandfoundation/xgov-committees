@@ -1,8 +1,10 @@
 import { decodeAddress } from 'algosdk';
-import { Committee } from './committee';
-import { isEqual } from './utils';
-import Ajv from 'ajv';
-import { committeeSchema } from './committee-schema';
+import { type Committee } from './committee.ts';
+import { isEqual } from './utils.ts';
+import _Ajv from 'ajv';
+import { committeeSchema } from './committee-schema.ts';
+
+const Ajv = _Ajv.default ?? _Ajv;
 
 export function validateCommitteeString(committeeStr: string): Committee {
   // no whitespace in committee
@@ -19,7 +21,7 @@ export function validateCommitteeString(committeeStr: string): Committee {
   const validate = new Ajv().compile(committeeSchema);
   if (!validate(committee)) {
     throw new Error(
-      `Committee JSON did not pass schema validation: ${validate.errors!.map((e) => e.message)}`,
+      `Committee JSON did not pass schema validation: ${validate.errors!.map((e: { message?: string }) => e.message)}`,
     );
   }
 

@@ -1,20 +1,24 @@
 import pMap from 'p-map';
-import { getBlocks } from '../blocks';
-import { getCachedRounds } from '../cache';
-import { cacheManager } from '../cache/cache-manager';
-import { CACHE_PAGE_SIZE } from '../cache/cache-page';
-import { validateBlockPage } from '../cache/s3-cache';
+import { getBlocks } from '../blocks.ts';
+import { getCachedRounds } from '../cache/index.ts';
+import { cacheManager } from '../cache/cache-manager.ts';
+import { CACHE_PAGE_SIZE } from '../cache/cache-page.ts';
+import { validateBlockPage } from '../cache/s3-cache.ts';
 import {
   getCandidateCommittee,
   saveCandidateCommittee,
   loadCandidateCommittee,
-} from '../candidate-committee';
-import { getCommittee, saveCommittee, loadCommittee, getCommitteeID } from '../committee';
-import { getBlockProposers, saveProposers, serializeProposers } from '../proposers';
-import { getSubscribedXgovs, saveSubscribedXgovs, loadSubscribedXgovs } from '../subscribed-xgovs';
-import { getMD5Hash, makeRndsArray } from '../utils';
-import { config } from '../config';
-import { getKeyWithNetworkMetadata, getMD5HashForObject } from '../s3';
+} from '../candidate-committee.ts';
+import { getCommittee, saveCommittee, loadCommittee, getCommitteeID } from '../committee.ts';
+import { getBlockProposers, saveProposers, serializeProposers } from '../proposers.ts';
+import {
+  getSubscribedXgovs,
+  saveSubscribedXgovs,
+  loadSubscribedXgovs,
+} from '../subscribed-xgovs.ts';
+import { getMD5Hash, makeRndsArray } from '../utils.ts';
+import { config } from '../config.ts';
+import { getKeyWithNetworkMetadata, getMD5HashForObject } from '../s3/index.ts';
 
 const { registryAppId } = config;
 

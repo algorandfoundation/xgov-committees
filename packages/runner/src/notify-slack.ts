@@ -9,6 +9,7 @@ const argv = await yargs(hideBin(process.argv))
   .option("exit-status", { type: "string", demandOption: true })
   .option("service-result", { type: "string", demandOption: true })
   .option("hostname", { type: "string", demandOption: true })
+  .option("unit-name", { type: "string", demandOption: true })
   .strict()
   .parse();
 
@@ -19,7 +20,7 @@ try {
     exitStatus: argv.exitStatus,
     serviceResult: argv.serviceResult,
     hostname: argv.hostname,
-    unitName: "runner.service",
+    unitName: argv.unitName,
     slackBotToken: config.slackBotToken,
     slackChannelId: config.slackChannelId,
   });

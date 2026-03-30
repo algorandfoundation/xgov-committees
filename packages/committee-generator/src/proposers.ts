@@ -1,13 +1,13 @@
 import pMap from 'p-map';
-import { getBlock } from './blocks';
-import { chunk, clearLine, fsExists, makeRndsArray, sleep } from './utils';
+import { getBlock } from './blocks.ts';
+import { chunk, clearLine, fsExists, makeRndsArray, sleep } from './utils.ts';
 import { writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
-import { ensureCacheSubPathExists } from './cache';
-import { getCachePath } from './cache/utils';
-import { CACHE_PAGE_SIZE } from './cache/cache-page';
-import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
-import { guardWhileNotShuttingDown } from './shutdown';
+import { ensureCacheSubPathExists } from './cache/index.ts';
+import { getCachePath } from './cache/utils.ts';
+import { CACHE_PAGE_SIZE } from './cache/cache-page.ts';
+import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3/index.ts';
+import { guardWhileNotShuttingDown } from './shutdown.ts';
 
 export type ProposerMap = Map<string, number[]>;
 

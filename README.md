@@ -1,67 +1,31 @@
-# xgov-committees
+# xGov Committees
 
-A monorepo for Algorand xGov committee generation and validation tools.
+Monorepo for automating Algorand [xGov](https://xgov.algorand.co) [committee file](https://arc.algorand.foundation/ARCs/arc-0086#representation) generation. Produces the xGov committee file for each governance period using an archival node, based on block proposer data and subscribed xGovs in the [xGov Registry](https://docs.xgov.algorand.co/specs/xgov-registry).
 
-## Overview
+The committee declaration on the xGov Registry is out of scope of this monorepo and is handled by a cron CI job on [algorandfoundation/xgov-beta-sc](https://github.com/algorandfoundation/xgov-beta-sc) repository.
 
-This repository contains tools for producing xGov committee files for Algorand governance cohorts using archival node data.
-
-## Repository Structure
-
-```
-xgov-committees/
-├── packages/
-│   └── committee-generator/          # Main committee generation package
-│       ├── src/
-│       │   ├── algod.ts              # Algod node interactions
-│       │   ├── blocks.ts             # Block header fetching
-│       │   ├── proposers.ts          # Proposer data aggregation
-│       │   ├── candidate-committee.ts # Candidate committee generation
-│       │   ├── subscribed-xgovs.ts   # xGov subscription queries
-│       │   ├── committee.ts          # Committee file generation
-│       │   ├── config.ts             # Configuration handling
-│       │   └── cache/                # Caching utilities (S3 & local)
-│       ├── test/                     # Test files (vitest)
-│       ├── package.json
-│       ├── tsconfig.json
-│       └── run.sh                    # CLI entry point
-├── package.json                      # Root workspace config
-├── tsconfig.json                     # Root TypeScript config
-└── .gitignore
-```
-
-## Workspace Setup
-
-This is a pnpm workspaces monorepo. All packages are located in the `packages/` directory.
-
-### Install Dependencies
-
-```bash
-pnpm install
-```
-
-### Build
-
-```bash
-pnpm run build
-```
-
-### Test
-
-```bash
-pnpm run test
-```
-
-## Key Packages
+## Packages
 
 ### committee-generator
 
-Main package for:
+Fetches block headers from an archival node, aggregates proposer data, and produces ARC-86 committee files. Uploads data to a public S3-like bucket.
 
-- Fetching block headers from archival nodes
-- Aggregating proposer data
-- Generating candidate committees
-- Querying subscribed xGov members
-- Creating and validating committee files
+See [`packages/committee-generator`](packages/committee-generator/README.md).
 
-See `packages/committee-generator/README.md` for detailed usage.
+### runner
+
+Systemd service that tracks governance periods and automatically drives the committee generator. Handles bootstrapping from an empty bucket, incremental cache warming, and Slack failure notifications.
+
+See [`packages/runner`](packages/runner/README.md).
+
+## Setup
+
+```bash
+pnpm install
+pnpm run build
+pnpm test
+```
+
+## Deploy
+
+See [`packages/runner/systemd/DEPLOY.md`](packages/runner/systemd/DEPLOY.md).

@@ -5,7 +5,7 @@ import { join } from 'path';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
-import { BinaryLike, createHash } from 'crypto';
+import { type BinaryLike, createHash } from 'crypto';
 
 export async function fsExists(path: string) {
   try {

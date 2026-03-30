@@ -1,8 +1,8 @@
 import { join } from 'path';
-import { CACHE_MAX_PAGES, CACHE_PAGE_SIZE, CachePage } from './cache-page';
-import { getCachePath } from './utils';
-import { fsExists, sleep } from '../utils';
-import { config } from '../config';
+import { CACHE_MAX_PAGES, CACHE_PAGE_SIZE, CachePage } from './cache-page.ts';
+import { getCachePath } from './utils.ts';
+import { fsExists, sleep } from '../utils.ts';
+import { config } from '../config.ts';
 
 export function getPageStartRnd(rnd: number) {
   return Math.floor(rnd / CACHE_PAGE_SIZE) * CACHE_PAGE_SIZE;

@@ -1,5 +1,5 @@
 import { createHook } from 'async_hooks';
-import { shutdownCache } from './cache/cache-manager';
+import { shutdownCache } from './cache/cache-manager.ts';
 
 export const ExitCode = {
   SUCCESS: 0,

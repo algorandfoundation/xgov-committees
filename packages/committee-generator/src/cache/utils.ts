@@ -1,6 +1,6 @@
 import { join } from 'path';
-import { config } from '../config';
-import { networkMetadata } from '../algod';
+import { config } from '../config.ts';
+import { networkMetadata } from '../algod.ts';
 
 export const getCachePath = (subPath: string): string => {
   const { genesisID, genesisHash } = networkMetadata;

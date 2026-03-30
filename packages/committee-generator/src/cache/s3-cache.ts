@@ -1,13 +1,17 @@
 import { join } from 'path';
-import { config } from '../config';
-import { getKeyWithNetworkMetadata, getMD5HashForObject, getPublicUrlForObject } from '../s3';
-import { clearLine, downloadToFile, formatDuration, fsExists, getMD5Hash } from '../utils';
+import { config } from '../config.ts';
+import {
+  getKeyWithNetworkMetadata,
+  getMD5HashForObject,
+  getPublicUrlForObject,
+} from '../s3/index.ts';
+import { clearLine, downloadToFile, formatDuration, fsExists, getMD5Hash } from '../utils.ts';
 import pMap from 'p-map';
-import { ensureCacheSubPathExists } from '.';
-import { getCachePath } from './utils';
-import { CACHE_PAGE_SIZE } from './cache-page';
+import { ensureCacheSubPathExists } from './index.ts';
+import { getCachePath } from './utils.ts';
+import { CACHE_PAGE_SIZE } from './cache-page.ts';
 import { readFile } from 'fs/promises';
-import { cacheManager } from './cache-manager';
+import { cacheManager } from './cache-manager.ts';
 
 export type CachePagePayload = Record<string, string>;
 

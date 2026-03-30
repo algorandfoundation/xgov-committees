@@ -1,9 +1,9 @@
-import { CACHE_PAGE_SIZE } from '../cache/cache-page';
-import { downloadBlockPages } from '../cache/s3-cache';
-import { loadCandidateCommittee, saveCandidateCommittee } from '../candidate-committee';
-import { loadCommittee, saveCommittee } from '../committee';
-import { loadProposers, saveProposers } from '../proposers';
-import { loadSubscribedXgovs, saveSubscribedXgovs } from '../subscribed-xgovs';
+import { CACHE_PAGE_SIZE } from '../cache/cache-page.ts';
+import { downloadBlockPages } from '../cache/s3-cache.ts';
+import { loadCandidateCommittee, saveCandidateCommittee } from '../candidate-committee.ts';
+import { loadCommittee, saveCommittee } from '../committee.ts';
+import { loadProposers, saveProposers } from '../proposers.ts';
+import { loadSubscribedXgovs, saveSubscribedXgovs } from '../subscribed-xgovs.ts';
 
 /**
  * Trust the artifacts on S3, downloading everything to the local cache (if not already present).

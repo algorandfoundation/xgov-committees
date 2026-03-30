@@ -1,9 +1,9 @@
 import { readFile, readdir, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { encodeJSON, decodeJSON, BlockHeader } from 'algosdk';
-import { chunk, clearLine, fsExists, sleep } from '../utils';
-import { getCachePath } from './utils';
-import { cacheManager, getPageStartRnd } from './cache-manager';
+import { chunk, clearLine, fsExists, sleep } from '../utils.ts';
+import { getCachePath } from './utils.ts';
+import { cacheManager, getPageStartRnd } from './cache-manager.ts';
 
 export const getCachedRounds = async (min: number, max: number): Promise<Set<number>> => {
   process.stderr.write('Reading block cache, please wait. This can take a while.');
