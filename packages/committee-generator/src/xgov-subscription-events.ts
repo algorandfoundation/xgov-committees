@@ -73,7 +73,7 @@ export const getXGovSubscriptionEvents = async (
   let txidCacheHits = 0;
 
   const lookupTxConfirmedRound = async (txid: string): Promise<bigint> => {
-    if (confirmedRoundCache[txid]) {
+    if (txid in confirmedRoundCache) {
       txidCacheHits++;
       return confirmedRoundCache[txid];
     }
