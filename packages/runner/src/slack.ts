@@ -23,7 +23,7 @@ interface PostFailureNotificationArgs extends ExecStopPostArgs {
 }
 
 export function isFailure(serviceResult: string): boolean {
-  return serviceResult !== "success" && serviceResult !== "timeout";
+  return serviceResult !== "success";
 }
 
 export function getJournalTail(unitName: string): string {
