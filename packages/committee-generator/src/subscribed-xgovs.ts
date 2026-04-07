@@ -53,7 +53,9 @@ export async function getSubscribedXgovs({
     `Found ${xgovBoxes.length} xGovs. Querying subscription rounds. Cutoff_block=${cutoffBlock} `,
   );
 
-  let ignored = 0;
+  // ignored xgovs are those that have subscribed after the cutoff round
+  const ignored: string[] = [];
+
   const xGovs: XGovsRecord = {};
   await pMap(
     xgovBoxes,
@@ -72,7 +74,7 @@ export async function getSubscribedXgovs({
         }
         xGovs[address] = subscribedRound;
       } else {
-        ignored++;
+        ignored.push(address);
         if (verbose) {
           console.warn(
             `Ignoring xGov subscribed (${subscribedRound}) after cutoff (${cutoffBlock}): ${address}`,
@@ -83,9 +85,9 @@ export async function getSubscribedXgovs({
     { concurrency },
   );
 
-  if (ignored) {
+  if (ignored.length > 0) {
     console.log(
-      `Ignoring ${ignored} xGov(s) that subscribed after the cutoff round (${cutoffBlock})`,
+      `Ignoring ${ignored.length} xGov(s) that subscribed after the cutoff round (${cutoffBlock})`,
     );
   }
 
