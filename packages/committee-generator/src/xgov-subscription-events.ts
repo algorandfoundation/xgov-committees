@@ -97,58 +97,72 @@ export const getXGovSubscriptionEvents = async (
   };
 
   const xGovEvents: XGovSubscriptionEvents = new Map();
+  // safe lookup of existing events for this xGov address, returns empty arrays if no existing events
+  const getExistingXGovEvents = (address: string) =>
+    xGovEvents.get(address) ?? {
+      subscribedEvents: [],
+      unsubscribedEvents: [],
+    };
 
   for (const logData of allLogs) {
     for (const log of logData.logs) {
       try {
         const actualPrefix = Buffer.from(log.subarray(0, 4));
-        const isSubscribedEvent = actualPrefix.compare(XGovEventPrefixes.XGovSubscribed) === 0;
+        const eventType =
+          actualPrefix.compare(XGovEventPrefixes.XGovSubscribed) === 0
+            ? 'subscribed'
+            : actualPrefix.compare(XGovEventPrefixes.XGovUnsubscribed) === 0
+              ? 'unsubscribed'
+              : 'unknown';
 
-        if (isSubscribedEvent || actualPrefix.compare(XGovEventPrefixes.XGovUnsubscribed) === 0) {
-          const confirmedAt: bigint = await lookupTxConfirmedRound(logData.txid);
+        // skip unknown events (those that don't match our subscribed/unsubscribed signatures)
+        if (eventType === 'unknown') {
+          continue;
+        }
 
-          if (isSubscribedEvent) {
-            // sub
-            const { xgov_address, delegate_address } = getARC28EventFromLog(
-              XGovEventSignatures.XGovSubscribed,
-              log,
-              ['xgov_address', 'delegate_address'],
-            );
+        // get confirmed round for each event
+        const confirmedAt: bigint = await lookupTxConfirmedRound(logData.txid);
 
-            const subscribeEvent = {
-              xGovAddress: xgov_address,
-              delegateAddress: delegate_address,
-              subscribedRound: confirmedAt,
-            };
+        if (eventType === 'subscribed') {
+          const {
+            xgov_address,
+            delegate_address,
+          }: { xgov_address: string; delegate_address: string } = getARC28EventFromLog(
+            XGovEventSignatures.XGovSubscribed,
+            log,
+            ['xgov_address', 'delegate_address'],
+          );
 
-            xGovEvents.set(xgov_address, {
-              subscribedEvents: [
-                ...(xGovEvents.get(xgov_address)?.subscribedEvents ?? []),
-                subscribeEvent,
-              ],
-              unsubscribedEvents: xGovEvents.get(xgov_address)?.unsubscribedEvents ?? [],
-            });
-          } else {
-            // unsub
-            const { xgov_address } = getARC28EventFromLog(
-              XGovEventSignatures.XGovUnsubscribed,
-              log,
-              ['xgov_address'],
-            );
+          const existingXGovEvents = getExistingXGovEvents(xgov_address);
 
-            const unsubscribeEvent = {
-              xGovAddress: xgov_address,
-              unsubscribedRound: confirmedAt,
-            };
+          const subscribeEvent = {
+            xGovAddress: xgov_address,
+            delegateAddress: delegate_address,
+            subscribedRound: confirmedAt,
+          };
 
-            xGovEvents.set(xgov_address, {
-              subscribedEvents: xGovEvents.get(xgov_address)?.subscribedEvents ?? [],
-              unsubscribedEvents: [
-                ...(xGovEvents.get(xgov_address)?.unsubscribedEvents ?? []),
-                unsubscribeEvent,
-              ],
-            });
-          }
+          xGovEvents.set(xgov_address, {
+            subscribedEvents: [...existingXGovEvents.subscribedEvents, subscribeEvent],
+            unsubscribedEvents: existingXGovEvents.unsubscribedEvents,
+          });
+        } else if (eventType === 'unsubscribed') {
+          const { xgov_address }: { xgov_address: string } = getARC28EventFromLog(
+            XGovEventSignatures.XGovUnsubscribed,
+            log,
+            ['xgov_address'],
+          );
+
+          const existingXGovEvents = getExistingXGovEvents(xgov_address);
+
+          const unsubscribeEvent = {
+            xGovAddress: xgov_address,
+            unsubscribedRound: confirmedAt,
+          };
+
+          xGovEvents.set(xgov_address, {
+            subscribedEvents: existingXGovEvents.subscribedEvents,
+            unsubscribedEvents: [...existingXGovEvents.unsubscribedEvents, unsubscribeEvent],
+          });
         }
       } catch (e) {
         console.warn(`Failed to parse logs: ${(e as Error).message}`);
