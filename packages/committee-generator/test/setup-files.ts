@@ -85,6 +85,9 @@ vi.mock('../src/config.ts', () => ({
     algodServer: 'http://localhost',
     algodPort: 4001,
     algodToken: '',
+    indexerServer: 'http://localhost',
+    indexerPort: 8980,
+    indexerToken: '',
     dataPath: 'data/',
     concurrency: 10,
     verbose: false,
@@ -117,6 +120,13 @@ vi.mock('../src/algod.ts', () => ({
     }),
   },
   getNetworkMetadata: () => Promise.resolve(TEST_NETWORK_METADATA),
+}));
+
+vi.mock('../src/indexer.ts', () => ({
+  indexer: {
+    lookupApplicationLogs: vi.fn(),
+    lookupTransactionByID: vi.fn(),
+  },
 }));
 
 // Export for test access

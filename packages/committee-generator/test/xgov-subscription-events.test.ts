@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { encodeAddress, decodeAddress, ABIType } from 'algosdk';
-import { getARC28Prefix } from '../src/utils';
+import { getARC28Prefix } from '../src/utils.ts';
 
 // ---- Test fixtures ----
 // Valid Algorand addresses derived from known public keys (filled byte patterns)
@@ -9,14 +9,7 @@ const XGOV_2 = encodeAddress(new Uint8Array(32).fill(2));
 const DELEGATE_1 = encodeAddress(new Uint8Array(32).fill(3));
 
 // ---- Mocks ----
-vi.mock('../src/config', () => ({
-  config: {
-    registryAppId: 42,
-    verbose: false,
-  },
-}));
-
-vi.mock('../src/indexer', () => ({
+vi.mock('../src/indexer.ts', () => ({
   indexer: {
     lookupApplicationLogs: vi.fn(),
     lookupTransactionByID: vi.fn(),
@@ -84,9 +77,13 @@ describe('getXGovSubscriptionEvents', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('returns an empty map when there are no log entries', async () => {
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     setupIndexerMock(indexer, [{}], {});
 
@@ -96,8 +93,8 @@ describe('getXGovSubscriptionEvents', () => {
   });
 
   it('parses a single XGovSubscribed event correctly', async () => {
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     setupIndexerMock(
       indexer,
@@ -108,19 +105,20 @@ describe('getXGovSubscriptionEvents', () => {
     const result = await getXGovSubscriptionEvents(1000n, 2000n);
 
     expect(result.size).toBe(1);
-    const events = result.get(XGOV_1)!;
-    expect(events.subscribedEvents).toHaveLength(1);
-    expect(events.subscribedEvents[0]).toEqual({
+    const events = result.get(XGOV_1);
+    expect(events).toBeDefined();
+    expect(events?.subscribedEvents).toHaveLength(1);
+    expect(events?.subscribedEvents[0]).toEqual({
       xGovAddress: XGOV_1,
       delegateAddress: DELEGATE_1,
       subscribedRound: 1200n,
     });
-    expect(events.unsubscribedEvents).toHaveLength(0);
+    expect(events?.unsubscribedEvents).toHaveLength(0);
   });
 
   it('parses a single XGovUnsubscribed event when no subscribe event is in range (subscribed before cutoff)', async () => {
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     setupIndexerMock(
       indexer,
@@ -131,10 +129,11 @@ describe('getXGovSubscriptionEvents', () => {
     const result = await getXGovSubscriptionEvents(1000n, 2000n);
 
     expect(result.size).toBe(1);
-    const events = result.get(XGOV_1)!;
-    expect(events.subscribedEvents).toHaveLength(0);
-    expect(events.unsubscribedEvents).toHaveLength(1);
-    expect(events.unsubscribedEvents[0]).toEqual({
+    const events = result.get(XGOV_1);
+    expect(events).toBeDefined();
+    expect(events?.subscribedEvents).toHaveLength(0);
+    expect(events?.unsubscribedEvents).toHaveLength(1);
+    expect(events?.unsubscribedEvents[0]).toEqual({
       xGovAddress: XGOV_1,
       unsubscribedRound: 1500n,
     });
@@ -142,8 +141,8 @@ describe('getXGovSubscriptionEvents', () => {
 
   it('tracks both subscribe and unsubscribe when both events are in range', async () => {
     // xGov subscribed after the cutoff, then unsubscribed — both events in the queried range
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     setupIndexerMock(
       indexer,
@@ -160,17 +159,18 @@ describe('getXGovSubscriptionEvents', () => {
 
     const result = await getXGovSubscriptionEvents(1000n, 2000n);
 
-    const events = result.get(XGOV_1)!;
-    expect(events.subscribedEvents).toHaveLength(1);
-    expect(events.subscribedEvents[0].subscribedRound).toBe(1100n);
-    expect(events.unsubscribedEvents).toHaveLength(1);
-    expect(events.unsubscribedEvents[0].unsubscribedRound).toBe(1400n);
+    const events = result.get(XGOV_1);
+    expect(events).toBeDefined();
+    expect(events?.subscribedEvents).toHaveLength(1);
+    expect(events?.subscribedEvents[0]?.subscribedRound).toBe(1100n);
+    expect(events?.unsubscribedEvents).toHaveLength(1);
+    expect(events?.unsubscribedEvents[0]?.unsubscribedRound).toBe(1400n);
   });
 
   it('accumulates multiple events of the same type for the same xGov', async () => {
     // xGov unsubscribed, then re-subscribed after cutoff — both events should be preserved
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     setupIndexerMock(
       indexer,
@@ -187,18 +187,19 @@ describe('getXGovSubscriptionEvents', () => {
 
     const result = await getXGovSubscriptionEvents(1000n, 2000n);
 
-    const events = result.get(XGOV_1)!;
-    expect(events.unsubscribedEvents).toHaveLength(1);
-    expect(events.unsubscribedEvents[0].unsubscribedRound).toBe(1100n);
-    expect(events.subscribedEvents).toHaveLength(1);
-    expect(events.subscribedEvents[0].subscribedRound).toBe(1400n);
+    const events = result.get(XGOV_1);
+    expect(events).toBeDefined();
+    expect(events?.unsubscribedEvents).toHaveLength(1);
+    expect(events?.unsubscribedEvents[0]?.unsubscribedRound).toBe(1100n);
+    expect(events?.subscribedEvents).toHaveLength(1);
+    expect(events?.subscribedEvents[0]?.subscribedRound).toBe(1400n);
   });
 
   it('tracks multiple xGovs independently', async () => {
     // XGOV_1: subscribed before cutoff, unsubscribed after (only unsub event in range)
     // XGOV_2: subscribed and unsubscribed both within the range
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     setupIndexerMock(
       indexer,
@@ -218,22 +219,24 @@ describe('getXGovSubscriptionEvents', () => {
 
     expect(result.size).toBe(2);
 
-    const xgov1Events = result.get(XGOV_1)!;
-    expect(xgov1Events.subscribedEvents).toHaveLength(0);
-    expect(xgov1Events.unsubscribedEvents).toHaveLength(1);
-    expect(xgov1Events.unsubscribedEvents[0].unsubscribedRound).toBe(1200n);
+    const xgov1Events = result.get(XGOV_1);
+    expect(xgov1Events).toBeDefined();
+    expect(xgov1Events?.subscribedEvents).toHaveLength(0);
+    expect(xgov1Events?.unsubscribedEvents).toHaveLength(1);
+    expect(xgov1Events?.unsubscribedEvents[0]?.unsubscribedRound).toBe(1200n);
 
-    const xgov2Events = result.get(XGOV_2)!;
-    expect(xgov2Events.subscribedEvents).toHaveLength(1);
-    expect(xgov2Events.subscribedEvents[0].subscribedRound).toBe(1100n);
-    expect(xgov2Events.unsubscribedEvents).toHaveLength(1);
-    expect(xgov2Events.unsubscribedEvents[0].unsubscribedRound).toBe(1300n);
+    const xgov2Events = result.get(XGOV_2);
+    expect(xgov2Events).toBeDefined();
+    expect(xgov2Events?.subscribedEvents).toHaveLength(1);
+    expect(xgov2Events?.subscribedEvents[0]?.subscribedRound).toBe(1100n);
+    expect(xgov2Events?.unsubscribedEvents).toHaveLength(1);
+    expect(xgov2Events?.unsubscribedEvents[0]?.unsubscribedRound).toBe(1300n);
   });
 
   it('caches txid round lookups — same txid across events triggers only one indexer call', async () => {
     // Two events share the same txid; lookupTransactionByID should only be called once
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     setupIndexerMock(
       indexer,
@@ -256,8 +259,8 @@ describe('getXGovSubscriptionEvents', () => {
   });
 
   it('collects events from all pages when results are paginated', async () => {
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     setupIndexerMock(
       indexer,
@@ -275,16 +278,17 @@ describe('getXGovSubscriptionEvents', () => {
 
     const result = await getXGovSubscriptionEvents(1000n, 2000n);
 
-    const events = result.get(XGOV_1)!;
-    expect(events.subscribedEvents).toHaveLength(1);
-    expect(events.subscribedEvents[0].subscribedRound).toBe(1100n);
-    expect(events.unsubscribedEvents).toHaveLength(1);
-    expect(events.unsubscribedEvents[0].unsubscribedRound).toBe(1400n);
+    const events = result.get(XGOV_1);
+    expect(events).toBeDefined();
+    expect(events?.subscribedEvents).toHaveLength(1);
+    expect(events?.subscribedEvents[0]?.subscribedRound).toBe(1100n);
+    expect(events?.unsubscribedEvents).toHaveLength(1);
+    expect(events?.unsubscribedEvents[0]?.unsubscribedRound).toBe(1400n);
   });
 
   it('silently skips logs with unrecognized event prefixes and still processes valid events', async () => {
-    const { indexer } = await import('../src/indexer');
-    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events');
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
 
     // A log with an unknown 4-byte prefix followed by an arbitrary payload
     const unknownLog = new Uint8Array([0xde, 0xad, 0xbe, 0xef, ...new Uint8Array(32)]);
@@ -308,6 +312,8 @@ describe('getXGovSubscriptionEvents', () => {
 
     // Unknown log skipped; valid subscribed event still processed
     expect(result.size).toBe(1);
-    expect(result.get(XGOV_1)!.subscribedEvents).toHaveLength(1);
+    const events = result.get(XGOV_1);
+    expect(events).toBeDefined();
+    expect(events?.subscribedEvents).toHaveLength(1);
   });
 });
