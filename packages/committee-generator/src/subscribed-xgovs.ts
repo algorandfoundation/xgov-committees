@@ -6,12 +6,9 @@ import { getCachePath } from './cache/utils.ts';
 import { ensureCacheSubPathExists } from './cache/index.ts';
 import { join } from 'path';
 import { readFile, writeFile } from 'fs/promises';
-import { clearLine, fsExists } from './utils';
-import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3';
-import { getXGovSubscriptionEvents } from './xgov-subscription-events';
-import { clearLine, fsExists } from './utils.ts';
+import { getXGovSubscriptionEvents } from './xgov-subscription-events.ts';
 import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3/index.ts';
-
+import { clearLine, fsExists } from './utils.ts';
 /*
     Gets subscribed xGovs from registry contract
 

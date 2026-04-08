@@ -1,6 +1,6 @@
-import { config } from './config';
-import { indexer } from './indexer';
-import { getARC28EventFromLog, getARC28Prefix } from './utils';
+import { config } from './config.ts';
+import { indexer } from './indexer.ts';
+import { getARC28EventFromLog, getARC28Prefix } from './utils.ts';
 
 const { registryAppId } = config;
 
