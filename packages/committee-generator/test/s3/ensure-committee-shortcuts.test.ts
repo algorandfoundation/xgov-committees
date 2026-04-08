@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PutObjectCommand, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files';
-import { createCommitteeFixture, getExpectedKey, cleanupS3Prefix } from './helpers';
-import type { Committee } from '../../src/committee';
+import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files.ts';
+import { createCommitteeFixture, getExpectedKey, cleanupS3Prefix } from './helpers.ts';
+import type { Committee } from '../../src/committee.ts';
 
 // In-memory store for committee data (simulates S3) - use vi.hoisted to make it available to mocks
 const { committeeStore } = vi.hoisted(() => {
@@ -12,8 +12,8 @@ const { committeeStore } = vi.hoisted(() => {
 });
 
 // Mock the committee module to avoid algod dependencies
-vi.mock('../../src/committee', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof import('../../src/committee');
+vi.mock('../../src/committee.ts', async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof import('../../src/committee.ts');
 
   return {
     ...actual,
@@ -58,7 +58,7 @@ describe('ensureCommitteeShortcuts', () => {
     );
 
     // Run the function
-    const { ensureCommitteeShortcuts } = await import('../../src/s3');
+    const { ensureCommitteeShortcuts } = await import('../../src/s3/index.ts');
     await ensureCommitteeShortcuts();
 
     // List all objects to verify shortcuts were created
@@ -101,8 +101,8 @@ describe('ensureCommitteeShortcuts', () => {
     const endRoundKey = getExpectedKey('committee/58005000.json');
 
     // Get the committee ID to create the ID-based shortcut
-    const { getCommitteeID } = await import('../../src/committee');
-    const { committeeIdToSafeFileName } = await import('../../src/utils');
+    const { getCommitteeID } = await import('../../src/committee.ts');
+    const { committeeIdToSafeFileName } = await import('../../src/utils.ts');
     const committeeID = getCommitteeID(committeeData);
     const safeCommitteeID = committeeIdToSafeFileName(committeeID);
     const committeeIDKey = getExpectedKey(`committee/${safeCommitteeID}.json`);
@@ -133,7 +133,7 @@ describe('ensureCommitteeShortcuts', () => {
     ]);
 
     // Run the function
-    const { ensureCommitteeShortcuts } = await import('../../src/s3');
+    const { ensureCommitteeShortcuts } = await import('../../src/s3/index.ts');
     await ensureCommitteeShortcuts();
 
     // List all objects - should still be 4 (no duplicates, includes index.json)
@@ -176,7 +176,7 @@ describe('ensureCommitteeShortcuts', () => {
     ]);
 
     // Run the function
-    const { ensureCommitteeShortcuts } = await import('../../src/s3');
+    const { ensureCommitteeShortcuts } = await import('../../src/s3/index.ts');
     await ensureCommitteeShortcuts();
 
     // List all objects - should now be 4 (original + both shortcuts + index.json)
@@ -222,7 +222,7 @@ describe('ensureCommitteeShortcuts', () => {
     ]);
 
     // Run the function
-    const { ensureCommitteeShortcuts } = await import('../../src/s3');
+    const { ensureCommitteeShortcuts } = await import('../../src/s3/index.ts');
     await ensureCommitteeShortcuts();
 
     // Fetch index.json

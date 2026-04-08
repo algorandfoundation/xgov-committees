@@ -42,9 +42,12 @@ describe("isFailure", () => {
     expect(isFailure("success")).toBe(false);
   });
 
-  it.each(["exit-code", "signal", "timeout", "watchdog"])("returns true for '%s'", (result) => {
-    expect(isFailure(result)).toBe(true);
-  });
+  it.each(["exit-code", "signal", "timeout", "watchdog", "core-dump", "start-limit-hit"])(
+    "returns true for '%s'",
+    (result) => {
+      expect(isFailure(result)).toBe(true);
+    },
+  );
 });
 
 describe("buildMessage", () => {

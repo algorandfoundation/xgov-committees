@@ -1,21 +1,24 @@
 import pMap from 'p-map';
-import { config } from './config';
-import { algod, networkMetadata } from './algod';
-import { subtractCached, getCache, setCache } from './cache';
-import { chunk, clearLine, formatDuration, sleep } from './utils';
-import { BlockHeader, modelsv2 } from 'algosdk';
-import { guardWhileNotShuttingDown, fatalError } from './shutdown';
+import { config } from './config.ts';
+import { algod, networkMetadata } from './algod.ts';
+import { subtractCached, getCache, setCache } from './cache/index.ts';
+import { chunk, clearLine, formatDuration, sleep } from './utils.ts';
+import { type BlockHeader, modelsv2 } from 'algosdk';
+import { guardWhileNotShuttingDown, fatalError } from './shutdown.ts';
 
 /**
  * Error thrown when attempting to fetch a block beyond the blockchain tip.
  */
 export class TipReachedError extends Error {
-  constructor(public readonly blockNumber: bigint) {
+  readonly blockNumber: bigint;
+  constructor(blockNumber: bigint) {
     super(`Block ${blockNumber} not available. The tip of the blockchain has been reached.`);
     this.name = 'TipReachedError';
+    this.blockNumber = blockNumber;
   }
 }
 
+const RETRY_BACKOFF_MS = 1000; // 1 second
 const DELTA_TOLERANCE = 5n;
 
 /**
@@ -121,27 +124,36 @@ const _getBlock = async (rnd: number, skipCache: boolean = false): Promise<Block
     }
   }
 
-  let data: modelsv2.BlockResponse;
-
-  try {
-    data = await algod.block(rnd).headerOnly(true).do();
-  } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : String(e);
-    // Check if block is not available (404 error from ledger)
-    if (errorMessage.includes('failed to retrieve information from the ledger')) {
-      const { lastRound } = await algod.status().do();
-      if (!isGenuineTipReached(BigInt(rnd), lastRound)) {
-        await fatalError(
-          new Error(
-            `Block ${rnd} request failed unexpectedly (lastRound: ${lastRound}, delta exceeds tolerance: ${DELTA_TOLERANCE})`,
-          ),
-        );
+  const fetchFromNode = async (): Promise<modelsv2.BlockResponse> => {
+    try {
+      return await algod.block(rnd).headerOnly(true).do();
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      // Check if block is not available (404 error from ledger)
+      if (errorMessage.includes('failed to retrieve information from the ledger')) {
+        const { lastRound } = await algod.status().do();
+        if (!isGenuineTipReached(BigInt(rnd), lastRound)) {
+          await fatalError(
+            new Error(
+              `Block ${rnd} request failed unexpectedly (lastRound: ${lastRound}, delta exceeds tolerance: ${DELTA_TOLERANCE})`,
+            ),
+          );
+        }
+        throw new TipReachedError(BigInt(rnd));
       }
-      throw new TipReachedError(BigInt(rnd));
-    }
 
-    // rethrow other errors
-    throw e;
+      // rethrow other errors
+      throw e;
+    }
+  };
+
+  let data: modelsv2.BlockResponse;
+  try {
+    data = await fetchFromNode();
+  } catch (e) {
+    if (e instanceof TipReachedError) throw e;
+    await sleep(RETRY_BACKOFF_MS);
+    data = await fetchFromNode();
   }
 
   setCache(rnd, data.block.header);

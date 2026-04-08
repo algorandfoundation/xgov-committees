@@ -57,12 +57,11 @@ Build and run:
 pnpm run build
 
 # Success — no Slack message
-node dist/notify-slack.js --exit-status 0 --service-result success --hostname local
+node dist/notify-slack.js --exit-status 0 --service-result success --hostname local --unit-name runner.service
 
 # Failure — posts to Slack
-node dist/notify-slack.js --exit-status 1 --service-result exit-code --hostname local
+node dist/notify-slack.js --exit-status 1 --service-result exit-code --hostname local --unit-name runner.service
 
 # Other failure types
-node dist/notify-slack.js --exit-status 0 --service-result timeout --hostname local
-node dist/notify-slack.js --exit-status 0 --service-result watchdog --hostname local
+node dist/notify-slack.js --exit-status 0 --service-result watchdog --hostname local --unit-name runner.service
 ```

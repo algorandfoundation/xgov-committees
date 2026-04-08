@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { validateCommitteeString } from '../src/committee-validate';
-import { Committee } from '../src/committee';
+import { validateCommitteeString } from '../src/committee-validate.ts';
+import type { Committee } from '../src/committee.ts';
 
 function getCommitteeFixture(): Committee {
   return {

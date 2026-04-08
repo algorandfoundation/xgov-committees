@@ -1,10 +1,10 @@
 import { readFile, writeFile } from 'fs/promises';
-import { hashBuffer } from './utils';
-import { fsExists, getMD5Hash } from '../utils';
-import { config } from '../config';
+import { hashBuffer } from './utils.ts';
+import { fsExists, getMD5Hash } from '../utils.ts';
+import { config } from '../config.ts';
 import { basename } from 'path';
-import { getKeyWithNetworkMetadata, uploadData, getMD5HashForObject } from '../s3';
-import { CachePagePayload, fetchPageFromS3 } from './s3-cache';
+import { getKeyWithNetworkMetadata, uploadData, getMD5HashForObject } from '../s3/index.ts';
+import { type CachePagePayload, fetchPageFromS3 } from './s3-cache.ts';
 
 export const CACHE_PAGE_SIZE = 1_000;
 export const CACHE_MAX_PAGES = 10;

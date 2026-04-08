@@ -255,7 +255,19 @@ describe("notify-slack", () => {
   it("exits 0 silently when service-result is success", () => {
     const result = spawnSync(
       "node",
-      ["--import", "tsx/esm", NOTIFY_SCRIPT, "--exit-status", "0", "--service-result", "success", "--hostname", "test"],
+      [
+        "--import",
+        "tsx/esm",
+        NOTIFY_SCRIPT,
+        "--exit-status",
+        "0",
+        "--service-result",
+        "success",
+        "--hostname",
+        "test",
+        "--unit-name",
+        "test.service",
+      ],
       { encoding: "utf8", env: notifySlackEnv() },
     );
     expect(result.status).toBe(0);
@@ -276,6 +288,8 @@ describe("notify-slack", () => {
         "exit-code",
         "--hostname",
         "test",
+        "--unit-name",
+        "test.service",
       ],
       { encoding: "utf8", env: { ...process.env, SLACK_BOT_TOKEN: "", SLACK_CHANNEL_ID: "" } },
     );
@@ -307,6 +321,8 @@ describe("notify-slack", () => {
         "exit-code",
         "--hostname",
         "integration-test",
+        "--unit-name",
+        "test.service",
       ],
       {
         encoding: "utf8",

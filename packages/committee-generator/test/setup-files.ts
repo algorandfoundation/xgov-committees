@@ -76,7 +76,7 @@ beforeAll(async () => {
 });
 
 // Setup config mock with cached endpoint
-vi.mock('../src/config', () => ({
+vi.mock('../src/config.ts', () => ({
   config: {
     cacheMode: 'write-cache' as const,
     registryAppId: 3147789458,
@@ -105,7 +105,7 @@ vi.mock('../src/config', () => ({
   },
 }));
 
-vi.mock('../src/algod', () => ({
+vi.mock('../src/algod.ts', () => ({
   networkMetadata: TEST_NETWORK_METADATA,
   algod: {
     getTransactionParams: () => ({
@@ -133,6 +133,6 @@ export function getGlobalLocalStack() {
 
 // Helper to reset S3 client singleton
 export async function resetS3ClientForTests() {
-  const { resetS3Client } = await import('../src/s3');
+  const { resetS3Client } = await import('../src/s3/index.ts');
   resetS3Client();
 }

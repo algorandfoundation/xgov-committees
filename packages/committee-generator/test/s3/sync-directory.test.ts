@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files';
-import { getExpectedKey, cleanupS3Prefix } from './helpers';
+import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files.ts';
+import { getExpectedKey, cleanupS3Prefix } from './helpers.ts';
 import { mkdtemp, rm, writeFile, mkdir } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -38,7 +38,7 @@ describe('syncDirectory', () => {
     await writeFile(join(tempDir, 'file1.json'), JSON.stringify({ test: 1 }));
     await writeFile(join(tempDir, 'file2.json'), JSON.stringify({ test: 2 }));
 
-    const { syncDirectory } = await import('../../src/s3');
+    const { syncDirectory } = await import('../../src/s3/index.ts');
     await syncDirectory(tempDir);
 
     // List all objects
@@ -62,7 +62,7 @@ describe('syncDirectory', () => {
     await writeFile(join(tempDir, 'existing.json'), JSON.stringify({ test: 'existing' }));
     await writeFile(join(tempDir, 'new.json'), JSON.stringify({ test: 'new' }));
 
-    const { syncDirectory } = await import('../../src/s3');
+    const { syncDirectory } = await import('../../src/s3/index.ts');
 
     // First sync - uploads both files
     await syncDirectory(tempDir);
@@ -111,7 +111,7 @@ describe('syncDirectory', () => {
     await writeFile(join(tempDir, 'subdir2', 'file2.json'), JSON.stringify({ level: 2 }));
     await writeFile(join(tempDir, 'subdir2', 'nested', 'deep.json'), JSON.stringify({ level: 3 }));
 
-    const { syncDirectory } = await import('../../src/s3');
+    const { syncDirectory } = await import('../../src/s3/index.ts');
     await syncDirectory(tempDir);
 
     // Verify all files uploaded with correct paths
@@ -134,7 +134,7 @@ describe('syncDirectory', () => {
     if (!tempDir) throw new Error('Temp directory not created');
 
     // Don't create any files - directory is empty
-    const { syncDirectory } = await import('../../src/s3');
+    const { syncDirectory } = await import('../../src/s3/index.ts');
 
     // Should not throw
     await syncDirectory(tempDir);
@@ -162,7 +162,7 @@ describe('syncDirectory', () => {
     }
     await Promise.all(promises);
 
-    const { syncDirectory } = await import('../../src/s3');
+    const { syncDirectory } = await import('../../src/s3/index.ts');
     await syncDirectory(tempDir);
 
     // Verify all files uploaded

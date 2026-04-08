@@ -1,18 +1,18 @@
 # xGov Committees Runner
 
-A systemd service that tracks [ARC-86](https://dev.algorand.co/arc-standards/arc-0086/) governance periods and spawns the committee generator to build block-header caches and compute xGov committees.
+A systemd service that tracks [ARC-86](https://dev.algorand.co/arc-standards/arc-0086/) governance periods and spawns the `committee-generator` to build block-header caches, compute xGov committees and upload data to a public bucket.
 
 Triggered by a systemd timer every 50 minutes. See [systemd/README.md](systemd/README.md) for unit configuration.
 
 ## How it works
 
-Per ARC-86, an xGov Committee is selected from a governance period `(Bi, Bf)` — the block range `[Bi; Bf)` from which xGov voting power is derived. Each xGov's voting power equals the number of blocks they proposed in that range. Consecutive governance periods shift by 1M blocks: `(Bi, Bf)` → `(Bi+1M, Bf+1M)`, with `Bf - Bi = 3M` blocks (the committee selection range). Once the chain passes `Bf`, the committee for that period can be computed and a new committee file is generated.
+Per ARC-86, an xGov Committee is selected from a governance period `(Bi, Bf)` — the block range `[Bi; Bf)` from which xGov voting power is derived. Each xGov's voting power equals the number of blocks they proposed in that range. Consecutive governance periods shift by 1M blocks: `(Bi, Bf)` → `(Bi+1M, Bf+1M)`, with `Bf - Bi = 3M` blocks (the committee selection range). Once the chain passes `Bf`, the cohort for that period can be computed and a new committee file is generated. Committee file generation is automatically handled by the `committee-generator` once a million round is surpassed.
 
 The runner tracks the last fully processed governance period and warms the cache for the next one. On each invocation the service loop evaluates three ordered cases:
 
-1. **Catch-up** — If the chain is already past `Bf`, process the full `[Bi; Bf)` range immediately. This handles bootstrapping and periods that were missed while the service was offline.
-2. **Close to period end** — If the chain is within 900 blocks of `Bf`, wait for it (plus a short buffer), then process the full range.
-3. **100K warming** — If a 100K-block boundary has been crossed since the last write-cache call, run the generator over `[Bi; Bf)` with `retryOnTip=false` (tip is expected and accepted silently). This keeps the block-header cache warm so that the final committee calculation at `Bf` is fast.
+1. **Catch-up**: If the chain is past the last processed end round, process the full 3M block range immediately. This handles bootstrapping and periods that were missed while the service was offline.
+2. **Close to period end**: If the chain is within 900 blocks of a million round, wait for it and process the remaining period blocks + committee file generation.
+3. **100K warming**: If a 100K-block boundary has been crossed since the last write-cache call, run the `committee-generator` for the current governance period (even if not finished yet), expecting to reach the chain tip and exiting silently (`retryOnTip=false`). This keeps the block-header cache warm so that the final committee calculation at million round is fast.
 
 After each case the loop re-evaluates, so a single invocation can catch up across multiple governance periods and then warm the cache for the current one.
 
@@ -22,14 +22,14 @@ The runner persists a JSON state file per network/registry pair in `STATE_DIR`:
 
 ```json
 {
-  "lastGovernancePeriod": { "Bi": 56000000, "Bf": 59000000 },
+  "lastGovernancePeriod": { "startRound": 56000000, "endRound": 59000000 },
   "lastCacheRound": 59112478,
   "updatedAt": "2026-03-20T12:00:00.000Z"
 }
 ```
 
-- `lastGovernancePeriod` — the last fully processed governance period `(Bi, Bf)`.
-- `lastCacheRound` — the last round at which a successful write-cache call was made.
+- `lastGovernancePeriod`: the last fully processed governance period `(Bi, Bf)`.
+- `lastCacheRound`: the last round at which a successful write-cache call was made.
 
 On first run the runner bootstraps from the initial governance period `(50M, 53M)`.
 
@@ -42,6 +42,8 @@ pnpm run typecheck    # type-check only
 pnpm run lint:fix     # lint + auto-fix
 pnpm run format       # format code
 ```
+
+> **Note:** `.prettierrc.json` mirrors the root config except for `printWidth` (120 vs 100) and `singleQuote` (false vs true).
 
 ## Testing
 
@@ -59,7 +61,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for test architecture, coverage details, 
 
 ## Configuration
 
-All variables have production defaults except Slack credentials, which are **required**.
+All variables have defaults except Slack credentials, which are **required**.
 
 | Variable                   | Default                                                           | Description                      |
 | -------------------------- | ----------------------------------------------------------------- | -------------------------------- |
@@ -74,14 +76,9 @@ All variables have production defaults except Slack credentials, which are **req
 
 Override via environment variables or an `.env` file at `/opt/xgov-committees/.env` (loaded by the systemd unit).
 
+> For production, use the `.io` variant of the Nodely endpoint (`mainnet-api.4160.nodely.io`) with an API token.
+
 ## Deploy
 
-The service expects the full monorepo at `/opt/xgov-committees/`, built from the root with `pnpm install && pnpm run build` (builds both `runner` and `committee-generator`).
-
-**Requirements:**
-
-- Node.js >= 20.19.0 and pnpm on the server
-- A dedicated `xgov-committees-runner` system user (the service runs unprivileged)
-- A `.env` file at `/opt/xgov-committees/.env` with `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` (see [Configuration](#configuration)). Must be readable by the service user's group (`root:xgov-committees-runner`, mode `640`)
-- A state directory at `/var/lib/xgov-committees-runner` owned by the service user
-- The systemd units from `systemd/` installed in `/etc/systemd/system/` — see [systemd/README.md](systemd/README.md) for unit configuration details
+- See [systemd/DEPLOY.md](systemd/DEPLOY.md) for the full deployment playbook (production and test setup).
+- See [systemd/README.md](systemd/README.md) for unit configuration details.

@@ -5,11 +5,11 @@ import {
   isShuttingDown,
   shutdown,
   ExitCode,
-} from '../src/shutdown';
-import { __testInternals } from './shutdown.test-helpers';
+} from '../src/shutdown.ts';
+import { __testInternals } from './shutdown.test-helpers.ts';
 
 // Mock the cache manager module before importing anything else
-vi.mock('../src/cache/cache-manager', () => ({
+vi.mock('../src/cache/cache-manager.ts', () => ({
   shutdownCache: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -27,7 +27,7 @@ describe('Shutdown Async Resource Tracking', () => {
     process.exit = exitMock;
 
     // Reset the mocked shutdownCache
-    const { shutdownCache } = await import('../src/cache/cache-manager');
+    const { shutdownCache } = await import('../src/cache/cache-manager.ts');
     vi.mocked(shutdownCache).mockClear();
     vi.mocked(shutdownCache).mockResolvedValue(undefined);
   });
@@ -276,7 +276,7 @@ describe('Shutdown Async Resource Tracking', () => {
     it('should complete shutdown and exit process', async () => {
       // Don't enable async tracking to allow quick completion
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const { shutdownCache } = await import('../src/cache/cache-manager');
+      const { shutdownCache } = await import('../src/cache/cache-manager.ts');
 
       // Start shutdown
       void shutdown(ExitCode.SUCCESS, 'expected', 'completion test');
