@@ -1,5 +1,5 @@
 import { Indexer } from 'algosdk';
-import { config } from './config';
+import { config } from './config.ts';
 
 const { indexerServer, indexerPort, indexerToken } = config;
 
