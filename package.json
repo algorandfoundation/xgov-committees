@@ -8,7 +8,6 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "prepare": "husky",
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "clean": "rm -rf packages/*/dist",
@@ -18,6 +17,7 @@
     "format:check": "pnpm -r --if-present run format:check"
   },
   "devDependencies": {
+    "vite": "^8.0.5",
     "husky": "^9.1.7",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.0.2",
@@ -27,7 +27,13 @@
     "tsx": "^4.20.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.18"
   },
-  "type": "module"
+  "type": "module",
+  "pnpm": {
+    "overrides": {
+      "picomatch@<4.0.4": "^4.0.4",
+      "lodash@<4.18.0": "^4.18.0"
+    }
+  }
 }
