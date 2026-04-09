@@ -16,12 +16,14 @@ Links to Mainnet committee files. `{period start round}-{period end round}: {com
 
 <!-- BEGIN COMMITTEE AUTOGEN -->
 
-- 50000000-53000000: [YdwWoYDvsAd4F2Ws/dXSt4sTqUwOelMLxcT3R0jlrFE=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/50000000-53000000.json)
-- 51000000-54000000: [Uk0nkuGWyT2b2zlsRSwZGl8Sp6tflAwWEuFo0Ouc3H4=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/51000000-54000000.json)
-- 52000000-55000000: [VfCa8q9E/gw9tKfVrlCOrmtOrXi4FimPF9v2sD1nlAA=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/52000000-55000000.json)
-- 53000000-56000000: [RRkptkcDDa5miKXHtJHo55JY4I4lg8xKZN85FuxF8K0=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/53000000-56000000.json)
-- 54000000-57000000: [efqI2KyJAXQbD+WqSkSiqEmnepXNVhWT2dIIX0OJzvg=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/54000000-57000000.json)
-- 55000000-58000000: [4ffYWWJh6jouRH0x6Re9oEbmWu40K9F8ukhRQ1teCpQ=](https://raw.githubusercontent.com/algorandfoundation/xgov-committees/refs/heads/main/data/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/55000000-58000000.json)
+- 50000000-53000000: [YdwWoYDvsAd4F2Ws/dXSt4sTqUwOelMLxcT3R0jlrFE=](https://xgov-committees.algorand.tech/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/50000000-53000000.json)
+- 51000000-54000000: [Uk0nkuGWyT2b2zlsRSwZGl8Sp6tflAwWEuFo0Ouc3H4=](https://xgov-committees.algorand.tech/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/51000000-54000000.json)
+- 52000000-55000000: [VfCa8q9E/gw9tKfVrlCOrmtOrXi4FimPF9v2sD1nlAA=](https://xgov-committees.algorand.tech/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/52000000-55000000.json)
+- 53000000-56000000: [RRkptkcDDa5miKXHtJHo55JY4I4lg8xKZN85FuxF8K0=](https://xgov-committees.algorand.tech/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/53000000-56000000.json)
+- 54000000-57000000: [efqI2KyJAXQbD+WqSkSiqEmnepXNVhWT2dIIX0OJzvg=](https://xgov-committees.algorand.tech/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/54000000-57000000.json)
+- 55000000-58000000: [4ffYWWJh6jouRH0x6Re9oEbmWu40K9F8ukhRQ1teCpQ=](https://xgov-committees.algorand.tech/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/55000000-58000000.json)
+- 56000000-59000000: [TxVlMnPRq4AhJyyiVvaf6jkZcDC0TcPPjAa2YXKZ0OM=](https://xgov-committees.algorand.tech/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/56000000-59000000.json)
+- 57000000-60000000: [ZI216HargaCw7lSXUO7JnUlyw5ZSGophmMDxgVJMUu8=](https://xgov-committees.algorand.tech/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/57000000-60000000.json)
 
 <!-- END COMMITTEE AUTOGEN -->
 
