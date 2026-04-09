@@ -267,6 +267,7 @@ This example line shows a proposer `DZX..` having produced one block (51910100):
 
 ```
 {"DZX4ZSE7QWTD3OPW47GEWE57OXTGXUVOATQKIIKM2DFJSLUHQXNNIH2QBQ":[51910100]}
+```
 
 The proposers directory stores aggregated proposed blocks per proposer for a given cohort.
 
@@ -293,12 +294,10 @@ The committee directory stores the final [ARC-86](https://arc.algorand.foundatio
 Example public URLs for cohort 1 on Mainnet:
 
 ```
-
-{S3*PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8*/committee/50000000-53000000.json
-{S3*PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8*/committee/53000000.json
-{S3*PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8*/committee/YdwWoYDvsAd4F2Ws*dXSt4sTqUwOelMLxcT3R0jlrFE*.json
-
-````
+{S3_PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/50000000-53000000.json
+{S3_PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/53000000.json
+{S3_PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/YdwWoYDvsAd4F2Ws/dXSt4sTqUwOelMLxcT3R0jlrFE_.json
+```
 
 #### index.json
 
@@ -325,7 +324,7 @@ An `index.json` file is maintained at `{network-prefix}/committee/index.json`. I
   "lastUpdated": "2026-03-16T00:00:00.000Z",
   "totalCommittees": 2
 }
-````
+```
 
 The `committees` object is keyed by the period end round number for efficient lookup by round. Each entry includes:
 
