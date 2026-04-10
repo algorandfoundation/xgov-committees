@@ -95,42 +95,55 @@ export async function getSubscribedXgovs({
     `Found ${Object.keys(xGovs).length} xGovs subscribed before cutoff round ${cutoffBlock}`,
   );
 
-  // get all xGov subscription/unsubscription events between cutoff and now
-  const xGovEvents = await getXGovSubscriptionEvents(BigInt(cutoffBlock), BigInt(lastRound + 1n));
+  // Query from before registry creation (52307574) to capture the full ARC-28 event history.
+  // Subscribers with no XGovSubscribed event in this window pre-date ARC-28 being wired in.
+  const XGOV_EVENTS_FROM_ROUND = 50000000n;
+  const xGovEvents = await getXGovSubscriptionEvents(XGOV_EVENTS_FROM_ROUND, BigInt(lastRound));
 
   let unsubAfterCutOffCount = 0;
 
   for (const [xGovAddress, { subscribedEvents, unsubscribedEvents }] of xGovEvents.entries()) {
-    let lastSubscribedRound: number = 0;
+    const hasUnsubAfterCutoff = unsubscribedEvents.some((e) => e.unsubscribedRound > cutoffBlock);
+    if (!hasUnsubAfterCutoff) continue;
 
-    // figure out the last subscribed round (if possible)
-    if (subscribedEvents.length > 0) {
-      lastSubscribedRound = subscribedEvents.reduce((latest, event) => {
-        return Number(event.subscribedRound > latest ? event.subscribedRound : latest);
-      }, 0);
-    }
+    // Replay events chronologically to determine state at cutoff.
+    const allEvents = [
+      ...subscribedEvents.map((e) => ({ round: e.subscribedRound, type: 'subscribe' as const })),
+      ...unsubscribedEvents.map((e) => ({ round: e.unsubscribedRound, type: 'unsub' as const })),
+    ].sort((a, b) => (a.round < b.round ? -1 : 1));
 
-    if (unsubscribedEvents.length > 0) {
-      const hasUnsubAfterCutoff = unsubscribedEvents.some((e) => e.unsubscribedRound > cutoffBlock);
+    const lastEventBeforeCutoff = allEvents.filter((e) => e.round < BigInt(cutoffBlock)).at(-1);
 
-      if (hasUnsubAfterCutoff) {
-        unsubAfterCutOffCount++;
+    // undefined + no subscribe events → subscribed before ARC-28 was deployed → eligible.
+    // undefined + has subscribe events → all subs are after cutoff → never eligible.
+    const subscribedAtCutoff =
+      lastEventBeforeCutoff === undefined
+        ? subscribedEvents.length === 0
+        : lastEventBeforeCutoff.type === 'subscribe';
 
-        if (config.verbose) {
-          if (lastSubscribedRound > 0) {
-            console.log(
-              `xGov unsubscribed and subscribed again ${lastSubscribedRound} after cutoff: ${xGovAddress}`,
-            );
-          } else {
-            console.log(
-              `xGov unsubscribed after cutoff without any prior subscribed event: ${xGovAddress}`,
-            );
-          }
+    if (subscribedAtCutoff) {
+      unsubAfterCutOffCount++;
+
+      if (config.verbose) {
+        if (lastEventBeforeCutoff === undefined) {
+          console.log(
+            `xGov unsubscribed after cutoff, no events before cutoff (pre-ARC28 subscriber): ${xGovAddress}`,
+          );
+        } else {
+          console.log(
+            `xGov subscribed at ${lastEventBeforeCutoff.round} and unsubscribed after cutoff: ${xGovAddress}`,
+          );
         }
-
-        // read the xGov, use the lastSubscribedRound if available, otherwise just place inside the cutoff
-        xGovs[xGovAddress] = lastSubscribedRound > 0 ? lastSubscribedRound : cutoffBlock - 1;
       }
+
+      // lastEventBeforeCutoff is always a 'subscribe' here ('unsub' excluded by subscribedAtCutoff).
+      // For pre-ARC28 subscribers the real round is unknown; cutoffBlock - 1 is a deterministic placeholder.
+      xGovs[xGovAddress] =
+        lastEventBeforeCutoff !== undefined ? Number(lastEventBeforeCutoff.round) : cutoffBlock - 1;
+    } else if (config.verbose) {
+      console.log(
+        `xGov last action before cutoff was unsub (round ${lastEventBeforeCutoff!.round}) — not eligible, skipping: ${xGovAddress}`,
+      );
     }
   }
 
