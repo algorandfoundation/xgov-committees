@@ -4,6 +4,7 @@ import {
   DeleteObjectsCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
+  MetadataDirective,
   PutObjectCommand,
   S3Client,
   type S3ClientConfig,
@@ -255,6 +256,8 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
                 Bucket: bucketName,
                 CopySource: `${bucketName}/${key}`,
                 Key: endRoundKey,
+                ContentType: 'application/json',
+                MetadataDirective: MetadataDirective.REPLACE, // Replace existing metadata
               }),
             )
             .then(() => {
@@ -275,6 +278,8 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
                 Bucket: bucketName,
                 CopySource: `${bucketName}/${key}`,
                 Key: committeeIDKey,
+                ContentType: 'application/json',
+                MetadataDirective: MetadataDirective.REPLACE, // Replace existing metadata
               }),
             )
             .then(() => {
@@ -316,7 +321,7 @@ export async function ensureCommitteeShortcuts(): Promise<void> {
     };
 
     const indexKey = getKeyWithNetworkMetadata('committee/index.json');
-    await uploadData(indexKey, JSON.stringify(indexData, null, 2));
+    await uploadData(indexKey, JSON.stringify(indexData, null, 2), false, 'application/json');
 
     if (config.verbose) {
       console.log(`Created committee index with ${indexEntries.length} committees at ${indexKey}`);
@@ -461,6 +466,7 @@ export async function getMD5HashForObject(key: string): Promise<string | undefin
  * @param key S3 key to upload under
  * @param data string or buffer data to upload
  * @param force if true, forces upload even if the object already exists (default: false)
+ * @param contentType optional MIME type of the content being uploaded
  * @throws Will throw an error if the upload fails
  * @returns {Promise<boolean>} Resolves when upload is completed or skipped due to existing identical object. Returns true if upload was performed, false if skipped.
  */
@@ -468,6 +474,7 @@ export async function uploadData(
   key: string,
   data: string | Uint8Array | Buffer,
   force: boolean = false,
+  contentType?: string,
 ): Promise<boolean> {
   const client = getS3Client();
   const { bucketName } = config.s3;
@@ -499,6 +506,7 @@ export async function uploadData(
       Bucket: bucketName,
       Key: key,
       Body: data,
+      ContentType: contentType,
     }),
   );
 

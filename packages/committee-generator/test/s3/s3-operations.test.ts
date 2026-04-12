@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getGlobalLocalStack, TEST_BUCKET_NAME, resetS3ClientForTests } from '../setup-files.ts';
 import { getExpectedKey, cleanupS3Prefix } from './helpers.ts';
 
@@ -246,6 +246,89 @@ describe('S3 Operations', () => {
 
       const uploadedData = await response.Body?.transformToString();
       expect(uploadedData).toBe(testData);
+    });
+
+    it('should set contentType correctly when provided', async () => {
+      const key = getExpectedKey('test/upload-content-type.json');
+      const testData = JSON.stringify({ test: 'contentType' });
+      const expectedContentType = 'application/json';
+
+      const { uploadData } = await import('../../src/s3/index.ts');
+
+      // Upload with specific contentType
+      const uploaded = await uploadData(key, testData, false, expectedContentType);
+      expect(uploaded).toBe(true);
+
+      // Verify the contentType was set correctly
+      const { s3Client } = getGlobalLocalStack();
+      const headResponse = await s3Client.send(
+        new HeadObjectCommand({
+          Bucket: TEST_BUCKET_NAME,
+          Key: key,
+        }),
+      );
+
+      expect(headResponse.ContentType).toBe(expectedContentType);
+    });
+
+    it('should handle different content types', async () => {
+      const { uploadData } = await import('../../src/s3/index.ts');
+      const { s3Client } = getGlobalLocalStack();
+
+      const testCases = [
+        {
+          key: getExpectedKey('test/upload-text.txt'),
+          data: 'plain text',
+          contentType: 'text/plain',
+        },
+        {
+          key: getExpectedKey('test/upload-image.png'),
+          data: Buffer.from([137, 80, 78, 71]),
+          contentType: 'image/png',
+        },
+        {
+          key: getExpectedKey('test/upload-csv.csv'),
+          data: 'col1,col2\nval1,val2',
+          contentType: 'text/csv',
+        },
+      ];
+
+      for (const testCase of testCases) {
+        const uploaded = await uploadData(testCase.key, testCase.data, false, testCase.contentType);
+        expect(uploaded).toBe(true);
+
+        const headResponse = await s3Client.send(
+          new HeadObjectCommand({
+            Bucket: TEST_BUCKET_NAME,
+            Key: testCase.key,
+          }),
+        );
+
+        expect(headResponse.ContentType).toBe(testCase.contentType);
+      }
+    });
+
+    it('should upload without contentType when not provided', async () => {
+      const key = getExpectedKey('test/upload-no-content-type.txt');
+      const testData = 'test data without content type';
+
+      const { uploadData } = await import('../../src/s3/index.ts');
+
+      // Upload without contentType
+      const uploaded = await uploadData(key, testData);
+      expect(uploaded).toBe(true);
+
+      // Verify the file was uploaded (contentType may be undefined or a default)
+      const { s3Client } = getGlobalLocalStack();
+      const headResponse = await s3Client.send(
+        new HeadObjectCommand({
+          Bucket: TEST_BUCKET_NAME,
+          Key: key,
+        }),
+      );
+
+      // If no contentType was provided, S3 may set it to a default or leave it undefined
+      expect(headResponse.ContentType).toBeDefined();
     });
   });
 

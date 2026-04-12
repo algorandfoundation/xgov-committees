@@ -116,7 +116,7 @@ export async function saveCommittee(
   if (to === 's3') {
     const key = getKeyWithNetworkMetadata(`${cacheSubPath}/${fromBlock}-${toBlock}.json`);
 
-    await uploadData(key, JSON.stringify(committee));
+    await uploadData(key, JSON.stringify(committee), false, 'application/json');
     return;
   }
 
