@@ -52,10 +52,10 @@ From- and to- blocks, and a run mode, are required. The least arguments you can 
 ./run.sh --mode use-cache --from-block 50000000 --to-block 53000000
 ```
 
-To run with an environment configuration file (here: `.env.mainnet.1`):
+To run with an environment configuration file (here: `.env`):
 
 ```bash
-# ENV=.env.mainnet.1 ./run.sh
+# ENV=.env ./run.sh
 ```
 
 When using `use-cache` mode, the script downloads all artifacts from S3 and exits:
@@ -273,14 +273,6 @@ The proposers directory stores aggregated proposed blocks per proposer for a giv
 
 Each file is named `{fromBlock}-{toBlock}.jsons` (note the `.jsons` extension — it is newline-delimited JSON, one entry per line).
 
-### candidate-committee/
-
-The candidate-committee directory stores the intermediate candidate committee data derived from the proposer data for a given cohort. Each file is named `{fromBlock}-{toBlock}.json`.
-
-### subscribed-xGovs/
-
-The subscribed-xGovs directory stores the list of xGov addresses that were subscribed to the xGov registry before the cohort cutoff round. Each file is named `{fromBlock}-{toBlock}.json`.
-
 ### committee/
 
 The committee directory stores the final [ARC-86](https://arc.algorand.foundation/ARCs/arc-0086) committee files. Each cohort produces a canonical file plus two access shortcuts:
@@ -334,11 +326,11 @@ The `committees` object is keyed by the period end round number for efficient lo
 - `totalMembers` — Number of xGov members in this committee
 - `totalVotes` — Total voting power across all members
 
-The `committees` object is keyed by period end round, with each value containing the committee metadata for that period. `committeeId` uses the original base64 encoding (with `+`, `/`, `=`); to derive the corresponding filename, replace `/` and `=` with `_`.
+Each `committees` object entry contains the committee metadata for that period. `committeeId` uses the original base64 encoding (with `+`, `/`, `=`); to derive the corresponding filename, replace `/` and `=` with `_`.
 
 ### candidate-committee/
 
-This directory stores the candidate committee members' voting power for a given cohort.
+This directory stores the candidate committee members' voting power for a given cohort. Each file is named `{fromBlock}-{toBlock}.json`.
 
 The payload is a JSON file, with the proposers as keys and the number of blocks produced as values.
 
@@ -352,7 +344,7 @@ This excerpt shows a proposer having produced one block, corresponding to 1 unit
 
 ### subscribed-xGovs/
 
-This directory stores the candidate-committee addresses that had subscribed to become xGovs before the cohort end block (a.k.a. `--to-block` in arguments)
+This directory stores the candidate-committee addresses that had subscribed to become xGovs before the cohort end block (a.k.a. `--to-block` in arguments). Each file is named `{fromBlock}-{toBlock}.json`.
 
 The payload is a JSON file, with subscribed xGovs as keys and their subscription round numbers as values.
 
