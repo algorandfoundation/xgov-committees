@@ -34,7 +34,7 @@ Requirements:
 - **Git-LFS**
   - This repo utilizes Git-LFS to distribute the data/ directory containing block headers, intermediate data and the committee files. See [git-lfs.com](https://git-lfs.com/) for installation instructions.
   - If you have cloned the repo before installing LFS, you can run `git lfs install` and `git lfs pull` to hydrate the data directory.
-- nodejs v18+
+- nodejs v20.19.0+
 
 Install pnpm package requirements:
 
@@ -296,7 +296,7 @@ Example public URLs for cohort 1 on Mainnet:
 ```
 {S3_PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/50000000-53000000.json
 {S3_PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/53000000.json
-{S3_PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/YdwWoYDvsAd4F2Ws/dXSt4sTqUwOelMLxcT3R0jlrFE_.json
+{S3_PUBLIC_URL}/mainnet-v1.0-wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8_/committee/YdwWoYDvsAd4F2Ws_dXSt4sTqUwOelMLxcT3R0jlrFE_.json
 ```
 
 #### index.json

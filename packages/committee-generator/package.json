@@ -19,7 +19,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "update-readme": "npx tsx scripts/update-readme-committee-links.ts"
+    "update-readme": "pnpm exec tsx scripts/update-readme-committee-links.ts"
   },
   "author": "",
   "license": "ISC",
