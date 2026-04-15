@@ -13,6 +13,9 @@ export type Config = {
   algodServer: string;
   algodPort: number;
   algodToken: string;
+  indexerServer: string;
+  indexerPort: number;
+  indexerToken: string;
   dataPath: string;
   concurrency: number;
   verbose: boolean;
@@ -93,6 +96,27 @@ const argvConfig = [
     type: 'string',
     description: 'algod server token',
     envVar: 'ALGOD_TOKEN',
+    defaultValue: '',
+  },
+  {
+    name: 'indexer-server',
+    type: 'string',
+    description: 'indexer server hostname',
+    envVar: 'INDEXER_SERVER',
+    defaultValue: 'https://mainnet-idx.4160.nodely.dev',
+  },
+  {
+    name: 'indexer-port',
+    type: 'number',
+    description: 'indexer server port',
+    envVar: 'INDEXER_PORT',
+    defaultValue: 443,
+  },
+  {
+    name: 'indexer-token',
+    type: 'string',
+    description: 'indexer server token',
+    envVar: 'INDEXER_TOKEN',
     defaultValue: '',
   },
   {
@@ -210,6 +234,9 @@ export const config: Config = {
   algodServer: parsedArgs['algod-server'] as string,
   algodPort: parsedArgs['algod-port'] as number,
   algodToken: parsedArgs['algod-token'] as string,
+  indexerServer: parsedArgs['indexer-server'] as string,
+  indexerPort: parsedArgs['indexer-port'] as number,
+  indexerToken: parsedArgs['indexer-token'] as string,
   dataPath: parsedArgs['data-path'] as string,
   concurrency: parsedArgs['concurrency'] as number,
   verbose: parsedArgs['verbose'] as boolean,

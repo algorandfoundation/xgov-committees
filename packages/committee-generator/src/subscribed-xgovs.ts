@@ -6,9 +6,9 @@ import { getCachePath } from './cache/utils.ts';
 import { ensureCacheSubPathExists } from './cache/index.ts';
 import { join } from 'path';
 import { readFile, writeFile } from 'fs/promises';
-import { clearLine, fsExists } from './utils.ts';
+import { getXGovSubscriptionEvents } from './xgov-subscription-events.ts';
 import { getKeyWithNetworkMetadata, getPublicUrlForObject, uploadData } from './s3/index.ts';
-
+import { clearLine, fsExists } from './utils.ts';
 /*
     Gets subscribed xGovs from registry contract
 
@@ -53,7 +53,9 @@ export async function getSubscribedXgovs({
     `Found ${xgovBoxes.length} xGovs. Querying subscription rounds. Cutoff_block=${cutoffBlock} `,
   );
 
-  let ignored = 0;
+  // ignored xgovs are those that have subscribed after the cutoff round
+  const ignored: string[] = [];
+
   const xGovs: XGovsRecord = {};
   await pMap(
     xgovBoxes,
@@ -72,7 +74,7 @@ export async function getSubscribedXgovs({
         }
         xGovs[address] = subscribedRound;
       } else {
-        ignored++;
+        ignored.push(address);
         if (verbose) {
           console.warn(
             `Ignoring xGov subscribed (${subscribedRound}) after cutoff (${cutoffBlock}): ${address}`,
@@ -83,15 +85,56 @@ export async function getSubscribedXgovs({
     { concurrency },
   );
 
-  if (ignored) {
+  if (ignored.length > 0) {
     console.log(
-      `Ignoring ${ignored} xGov(s) that subscribed after the cutoff round (${cutoffBlock})`,
+      `Ignoring ${ignored.length} xGov(s) that subscribed after the cutoff round (${cutoffBlock})`,
     );
   }
 
   console.log(
     `Found ${Object.keys(xGovs).length} xGovs subscribed before cutoff round ${cutoffBlock}`,
   );
+
+  // get all xGov subscription/unsubscription events between cutoff and now
+  const xGovEvents = await getXGovSubscriptionEvents(BigInt(cutoffBlock), BigInt(lastRound + 1n));
+
+  let unsubAfterCutOffCount = 0;
+
+  for (const [xGovAddress, { subscribedEvents, unsubscribedEvents }] of xGovEvents.entries()) {
+    let lastSubscribedRound: number = 0;
+
+    // figure out the last subscribed round (if possible)
+    if (subscribedEvents.length > 0) {
+      lastSubscribedRound = subscribedEvents.reduce((latest, event) => {
+        return Number(event.subscribedRound > latest ? event.subscribedRound : latest);
+      }, 0);
+    }
+
+    if (unsubscribedEvents.length > 0) {
+      const hasUnsubAfterCutoff = unsubscribedEvents.some((e) => e.unsubscribedRound > cutoffBlock);
+
+      if (hasUnsubAfterCutoff) {
+        unsubAfterCutOffCount++;
+
+        if (config.verbose) {
+          if (lastSubscribedRound > 0) {
+            console.log(
+              `xGov unsubscribed and subscribed again ${lastSubscribedRound} after cutoff: ${xGovAddress}`,
+            );
+          } else {
+            console.log(
+              `xGov unsubscribed after cutoff without any prior subscribed event: ${xGovAddress}`,
+            );
+          }
+        }
+
+        // read the xGov, use the lastSubscribedRound if available, otherwise just place inside the cutoff
+        xGovs[xGovAddress] = lastSubscribedRound > 0 ? lastSubscribedRound : cutoffBlock - 1;
+      }
+    }
+  }
+
+  console.log(unsubAfterCutOffCount, 'xGovs unsubscribed after cutoff');
 
   return xGovs;
 }
