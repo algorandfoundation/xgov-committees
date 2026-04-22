@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "kappa": {
+      "type": "http",
+      "url": "https://algorand-docs.mcp.kapa.ai/"
+    },
+    "vibekit-mcp": {
+      "command": "vibekit",
+      "args": [
+        "mcp"
+      ],
+      "env": {
+        "ALGORAND_NETWORK": "localnet",
+        "ALGORAND_ALGOD": "http://localhost:4001",
+        "ALGORAND_TOKEN": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "ALGORAND_KMD": "http://localhost:4002",
+        "ALGORAND_KMD_TOKEN": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "ALGORAND_INDEXER": "http://localhost:8980"
+      }
+    }
+  }
+}

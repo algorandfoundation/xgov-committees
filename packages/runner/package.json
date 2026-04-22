@@ -1,0 +1,36 @@
+{
+  "name": "xgov-committees-runner",
+  "version": "1.0.0",
+  "description": "Service runner for xGov automated committee generation",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
+    "format:check": "prettier --check . --ignore-path ../../.prettierignore",
+    "test": "pnpm run test:unit && pnpm run test:integration",
+    "test:coverage": "vitest run --coverage",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:integration:slack": "dotenv -e ../../.env -- vitest run test/integration",
+    "test:systemd": "bash test/systemd/run-test-container.sh verify && bash test/systemd/run-test-container.sh boot && bash test/systemd/run-test-container.sh stop && bash test/systemd/run-test-container.sh failure && bash test/systemd/run-test-container.sh no-env",
+    "test:systemd:slack": "dotenv -e ../../.env -- bash test/systemd/run-test-container.sh failure"
+  },
+  "dependencies": {
+    "@algorandfoundation/algokit-utils": "^9.2.0",
+    "@slack/web-api": "^7.14.1",
+    "dotenv": "^17.3.1",
+    "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.13",
+    "@types/yargs": "^17.0.35",
+    "@vitest/coverage-v8": "^4.0.18",
+    "dotenv-cli": "^11.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

@@ -1,0 +1,6 @@
+packages:
+  - 'packages/*'
+
+# vite ^8.0.5 fixes GHSA-v2wj-q39q-566r / GHSA-p9ff-h696-f583 (released 2026-04-06, remove once >5 days old)
+minimumReleaseAgeExclude:
+  - vite
