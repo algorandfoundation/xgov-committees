@@ -22,7 +22,7 @@ See [`packages/runner`](packages/runner/README.md).
 
 ```bash
 pnpm install
-pnpm exec husky # once, .npmrc sets ignore-scripts=true, so git hooks aren't installed automatically
+pnpm exec husky # once, pnpm-workspace.yaml sets ignoreScripts: true, so git hooks aren't installed automatically
 pnpm run build
 pnpm test
 ```
