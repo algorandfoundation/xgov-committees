@@ -317,3 +317,103 @@ describe('getXGovSubscriptionEvents', () => {
     expect(events?.subscribedEvents).toHaveLength(1);
   });
 });
+
+describe('getXGovSubscriptionEvents pagination safety', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('stops when the indexer repeats the same nextToken and dedupes the repeated entry', async () => {
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
+
+    const entry = { txid: 'TX1', logs: [buildSubscribedLog(XGOV_1, DELEGATE_1)] };
+    setupIndexerMock(
+      indexer,
+      [
+        { logData: [entry], nextToken: 'same-token' },
+        // exact copy of the previous last entry with the same token — a stuck indexer
+        { logData: [{ ...entry }], nextToken: 'same-token' },
+        { logData: [{ ...entry }], nextToken: 'same-token' },
+      ],
+      { TX1: 1100n },
+    );
+
+    const result = await getXGovSubscriptionEvents(1000n, 2000n);
+
+    expect(vi.mocked(indexer.lookupApplicationLogs)).toHaveBeenCalledTimes(2);
+    expect(result.get(XGOV_1)?.subscribedEvents).toHaveLength(1);
+  });
+
+  it('stops when a page has a nextToken but no entries', async () => {
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
+
+    setupIndexerMock(
+      indexer,
+      [
+        {
+          logData: [{ txid: 'TX1', logs: [buildSubscribedLog(XGOV_1, DELEGATE_1)] }],
+          nextToken: 't1',
+        },
+        { logData: [], nextToken: 't2' },
+        { logData: [{ txid: 'TX2', logs: [buildUnsubscribedLog(XGOV_1)] }] },
+      ],
+      { TX1: 1100n, TX2: 1400n },
+    );
+
+    const result = await getXGovSubscriptionEvents(1000n, 2000n);
+
+    expect(vi.mocked(indexer.lookupApplicationLogs)).toHaveBeenCalledTimes(2);
+    expect(result.get(XGOV_1)?.unsubscribedEvents).toHaveLength(0);
+  });
+
+  it('keeps distinct logs from the same txid (dedupe key is txid + log bytes)', async () => {
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
+
+    setupIndexerMock(
+      indexer,
+      [
+        {
+          logData: [
+            { txid: 'TX1', logs: [buildSubscribedLog(XGOV_1, DELEGATE_1)] },
+            { txid: 'TX1', logs: [buildSubscribedLog(XGOV_2, DELEGATE_1)] },
+          ],
+        },
+      ],
+      { TX1: 1100n },
+    );
+
+    const result = await getXGovSubscriptionEvents(1000n, 2000n);
+
+    expect(result.size).toBe(2);
+  });
+
+  it('throws when the page limit is exceeded', async () => {
+    const { indexer } = await import('../src/indexer.ts');
+    const { getXGovSubscriptionEvents } = await import('../src/xgov-subscription-events.ts');
+
+    // every page has a fresh token and a fresh entry, so only the hard cap stops it
+    let i = 0;
+    vi.mocked(indexer.lookupApplicationLogs).mockImplementation(() => {
+      const chain = {
+        minRound: () => chain,
+        maxRound: () => chain,
+        nextToken: () => chain,
+        limit: () => ({
+          do: async () => {
+            i++;
+            return {
+              logData: [{ txid: `TX${i}`, logs: [buildSubscribedLog(XGOV_1, DELEGATE_1)] }],
+              nextToken: `token-${i}`,
+            };
+          },
+        }),
+      };
+      return chain as never;
+    });
+
+    await expect(getXGovSubscriptionEvents(1000n, 2000n)).rejects.toThrow(/Exceeded 1000 pages/);
+  });
+});

@@ -41,8 +41,16 @@ export const getXGovSubscriptionEvents = async (
 ): Promise<XGovSubscriptionEvents> => {
   let nextToken: string | undefined = '';
   const allLogs = [];
+  // hard cap so a misbehaving indexer fails loudly instead of looping forever
+  const maxPages = 1000;
 
-  while (true) {
+  for (let page = 0; ; page++) {
+    if (page >= maxPages) {
+      throw new Error(
+        `Exceeded ${maxPages} pages fetching application logs for app ${registryAppId}`,
+      );
+    }
+
     const r = await indexer
       .lookupApplicationLogs(registryAppId)
       .minRound(fromRound)
@@ -61,7 +69,8 @@ export const getXGovSubscriptionEvents = async (
       }
     }
 
-    if (!r.nextToken) {
+    // stop on last page, empty page, or a repeated token (indexer is not advancing)
+    if (!r.nextToken || !r.logData?.length || r.nextToken === nextToken) {
       break;
     }
 
@@ -104,8 +113,17 @@ export const getXGovSubscriptionEvents = async (
       unsubscribedEvents: [],
     };
 
+  // dedupe by txid + log bytes: one tx (incl. inner txns) can emit several logs, so txid alone is not enough
+  const seenLogs = new Set<string>();
+
   for (const logData of allLogs) {
     for (const log of logData.logs) {
+      const logKey = `${logData.txid}:${Buffer.from(log).toString('hex')}`;
+      if (seenLogs.has(logKey)) {
+        continue;
+      }
+      seenLogs.add(logKey);
+
       try {
         const actualPrefix = Buffer.from(log.subarray(0, 4));
         const eventType =
