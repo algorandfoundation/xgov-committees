@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    include: ['test/**/*.test.ts'], // vitest 4.1 no longer excludes dist/ by default
     environment: 'node',
     testTimeout: 120_000, // 2 minutes for LocalStack startup
     hookTimeout: 120_000,
